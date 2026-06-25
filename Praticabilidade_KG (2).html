@@ -1,0 +1,1403 @@
+<!--
+  =====================================================================
+  BTK Engenharia — BLOCO DE AUTENTICAÇÃO
+  Cole este bloco logo após o <head> de cada ferramenta (pmo.html,
+  dcma.html, praticavel.html). Substitua URL e KEY pelos seus valores.
+  =====================================================================
+-->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function() {
+  // ----------------------------------------------------------------
+  // Configuração — mesmos valores do login.html e admin.html
+  // ----------------------------------------------------------------
+  const SUPABASE_URL      = 'https://uybgtupjkswtkqisipom.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5Ymd0dXBqa3N3dGtxaXNpcG9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODA2MjcsImV4cCI6MjA5Nzg1NjYyN30.9Z_mZaeArTrs6ghTZIxLaed68i6aNzgFUiF2xXB1IaU';
+  // ----------------------------------------------------------------
+
+  const isConfigured = SUPABASE_URL !== 'https://uybgtupjkswtkqisipom.supabase.co';
+  if (!isConfigured) return; // Em modo demo, não verifica sessão
+
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  window._kgSupabase = sb; // Disponível para o restante do app
+
+  // Verifica sessão ao carregar
+  sb.auth.getSession().then(async ({ data }) => {
+    if (!data.session) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('status, name, tools')
+      .eq('id', data.session.user.id)
+      .single();
+
+    if (!profile || profile.status === 'blocked') {
+      await sb.auth.signOut();
+      window.location.href = 'login.html?msg=acesso_bloqueado';
+      return;
+    }
+
+    // Expõe info do usuário globalmente
+    window._kgUser = {
+      id: data.session.user.id,
+      email: data.session.user.email,
+      name: profile.name,
+      tools: profile.tools
+    };
+  });
+
+  // Ouve mudanças de sessão (logout de outra aba, token expirado)
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') {
+      window.location.href = 'login.html';
+    }
+  });
+})();
+</script>
+
+<!--
+  COMO USAR OS DADOS DO USUÁRIO NA FERRAMENTA:
+  
+  window._kgUser.email   → e-mail do usuário logado
+  window._kgUser.name    → nome / empresa
+  window._kgUser.tools   → array de ferramentas liberadas ex: ['pmo','dcma']
+  window._kgSupabase     → cliente Supabase para salvar dados no banco
+
+  SALVAR DADOS DO PROJETO NO SUPABASE (opcional):
+  Se quiser que os dados do PMO fiquem no servidor em vez do localStorage,
+  use a tabela abaixo. Crie no SQL Editor do Supabase:
+
+  CREATE TABLE project_data (
+    id         UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id    UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    tool       TEXT,          -- 'pmo', 'dcma', 'praticavel'
+    project_id TEXT,          -- ID interno do projeto no app
+    data       JSONB,         -- conteúdo serializado (tarefas, avanços...)
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  ALTER TABLE project_data ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Usuário acessa próprios dados"
+    ON project_data FOR ALL
+    USING (auth.uid() = user_id);
+  
+  Para salvar:
+  await window._kgSupabase.from('project_data').upsert({
+    user_id: window._kgUser.id,
+    tool: 'pmo',
+    project_id: 'fmt-001',
+    data: { tasks: [...], progress: {...} },
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'user_id,tool,project_id' });
+
+  Para carregar:
+  const { data } = await window._kgSupabase
+    .from('project_data')
+    .select('data')
+    .eq('user_id', window._kgUser.id)
+    .eq('tool', 'pmo')
+    .eq('project_id', 'fmt-001')
+    .single();
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora de Praticabilidade — KG Consultoria</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --kg-navy: #1a1f2e;
+    --kg-blue: #2d6be4;
+    --kg-blue-light: #4a84f0;
+    --kg-blue-dim: #1e3a6e;
+    --kg-text: #e8ecf4;
+    --kg-text-muted: #8fa3c8;
+    --kg-surface: #222840;
+    --kg-surface2: #2a3250;
+    --kg-surface3: #323d5e;
+    --kg-border: rgba(45,107,228,0.25);
+    --kg-border-bright: rgba(45,107,228,0.55);
+    --kg-success: #2dd4a0;
+    --kg-warning: #f0b429;
+    --kg-danger: #e05c5c;
+    --kg-rain1: #4a84f0;
+    --kg-rain2: #2d6be4;
+    --kg-rain3: #f0b429;
+    --kg-rain4: #e07d2d;
+    --kg-rain5: #e05c5c;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--kg-navy);
+    color: var(--kg-text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--kg-surface);
+    border-bottom: 1px solid var(--kg-border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo-box {
+    width: 38px; height: 38px;
+    background: var(--kg-blue);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px; color: #fff;
+    letter-spacing: -0.5px;
+    flex-shrink: 0;
+  }
+  .header-name { font-weight: 600; font-size: 15px; }
+  .header-sub { font-size: 11px; color: var(--kg-text-muted); margin-top: 1px; }
+  .header-right {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--kg-text-muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .badge-api {
+    background: rgba(45,107,228,0.2);
+    border: 1px solid var(--kg-border-bright);
+    color: var(--kg-blue-light);
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 11px;
+  }
+
+  /* ── LAYOUT ── */
+  .app { max-width: 1100px; margin: 0 auto; padding: 28px 20px; }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--kg-surface);
+    border: 1px solid var(--kg-border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 18px;
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--kg-blue-light);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .step-num {
+    width: 22px; height: 22px;
+    background: var(--kg-blue);
+    border-radius: 50%;
+    font-size: 11px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  /* ── FORM ELEMENTS ── */
+  .field-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 160px; }
+  .field label { font-size: 11px; color: var(--kg-text-muted); font-weight: 500; }
+  input[type=text], input[type=number], select {
+    background: var(--kg-surface2);
+    border: 1px solid var(--kg-border);
+    border-radius: var(--radius-sm);
+    color: var(--kg-text);
+    padding: 9px 12px;
+    font-size: 13px;
+    width: 100%;
+    outline: none;
+    transition: border-color .2s;
+  }
+  input[type=text]:focus, input[type=number]:focus, select:focus {
+    border-color: var(--kg-blue);
+  }
+  select option { background: var(--kg-surface2); }
+
+  /* ── CITY SEARCH ── */
+  .search-wrap { position: relative; }
+  #cityInput { padding-right: 38px; }
+  .search-icon {
+    position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+    color: var(--kg-text-muted); pointer-events: none; font-size: 15px;
+  }
+  #cityDropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--kg-surface2);
+    border: 1px solid var(--kg-border-bright);
+    border-radius: var(--radius-sm);
+    z-index: 50;
+    max-height: 220px; overflow-y: auto;
+    display: none;
+  }
+  .city-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--kg-border);
+    transition: background .15s;
+  }
+  .city-item:last-child { border-bottom: none; }
+  .city-item:hover { background: var(--kg-surface3); }
+  .city-item-name { font-size: 13px; }
+  .city-item-sub { font-size: 11px; color: var(--kg-text-muted); margin-top: 2px; }
+
+  /* ── STATION TAG ── */
+  .station-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(45,107,228,0.15);
+    border: 1px solid var(--kg-border-bright);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--kg-blue-light);
+    margin-top: 8px;
+  }
+  .station-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--kg-success); }
+
+  /* ── JORNADA GRID ── */
+  .jornada-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px;
+  }
+  .jornada-opt {
+    background: var(--kg-surface2);
+    border: 1px solid var(--kg-border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    text-align: center;
+  }
+  .jornada-opt:hover { border-color: var(--kg-blue); }
+  .jornada-opt.active {
+    border-color: var(--kg-blue);
+    background: rgba(45,107,228,0.15);
+  }
+  .jornada-opt .jh { font-size: 18px; font-weight: 700; color: var(--kg-blue-light); }
+  .jornada-opt .jl { font-size: 11px; color: var(--kg-text-muted); margin-top: 3px; }
+
+  /* ── SERVICES ── */
+  .service-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 8px; }
+  .service-opt {
+    background: var(--kg-surface2);
+    border: 1px solid var(--kg-border);
+    border-radius: var(--radius-sm);
+    padding: 11px 14px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    transition: border-color .2s, background .2s;
+    user-select: none;
+  }
+  .service-opt:hover { border-color: var(--kg-blue); }
+  .service-opt.active {
+    border-color: var(--kg-blue);
+    background: rgba(45,107,228,0.15);
+  }
+  .service-cb {
+    width: 16px; height: 16px; border-radius: 3px;
+    border: 1.5px solid var(--kg-border-bright);
+    background: transparent;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: background .15s;
+  }
+  .service-opt.active .service-cb { background: var(--kg-blue); border-color: var(--kg-blue); }
+  .service-cb-check { display: none; color: #fff; font-size: 11px; }
+  .service-opt.active .service-cb-check { display: block; }
+  .service-name { font-size: 13px; }
+
+  /* ── FERIADOS TABLE ── */
+  .fer-table { width: 100%; border-collapse: collapse; }
+  .fer-table th {
+    font-size: 11px; color: var(--kg-text-muted);
+    font-weight: 500; padding: 6px 10px;
+    text-align: left; border-bottom: 1px solid var(--kg-border);
+  }
+  .fer-table td { padding: 5px 10px; border-bottom: 1px solid rgba(45,107,228,0.1); }
+  .fer-table td:first-child { color: var(--kg-text-muted); font-size: 12px; width: 90px; }
+  .fer-num {
+    width: 56px; padding: 5px 8px; text-align: center;
+    background: var(--kg-surface2);
+    border: 1px solid var(--kg-border);
+    border-radius: var(--radius-sm);
+    color: var(--kg-text);
+    font-size: 13px;
+    outline: none;
+  }
+  .fer-num:focus { border-color: var(--kg-blue); }
+
+  /* ── PERIODO ── */
+  .periodo-wrap { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .periodo-wrap .field { min-width: 130px; }
+
+  /* ── BTN ── */
+  .btn-calc {
+    background: var(--kg-blue);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 12px 28px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+    transition: background .2s, transform .1s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-calc:hover { background: var(--kg-blue-light); }
+  .btn-calc:active { transform: scale(.98); }
+  .btn-calc:disabled { background: var(--kg-surface3); color: var(--kg-text-muted); cursor: not-allowed; }
+
+  /* ── PROGRESS ── */
+  .progress-area { display: none; }
+  .progress-steps { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .prog-step { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .prog-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+  .prog-icon.wait { background: var(--kg-surface3); color: var(--kg-text-muted); }
+  .prog-icon.running { background: var(--kg-blue); animation: pulse 1s infinite; }
+  .prog-icon.done { background: var(--kg-success); color: #0a2a1e; }
+  .prog-icon.error { background: var(--kg-danger); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  /* ── RESULTS ── */
+  #results { display: none; }
+  .result-header {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 20px;
+  }
+  .result-title { font-size: 18px; font-weight: 700; }
+  .result-sub { font-size: 12px; color: var(--kg-text-muted); margin-top: 2px; }
+
+  /* ── METRIC CARDS ── */
+  .metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 10px; margin-bottom: 18px; }
+  .metric {
+    background: var(--kg-surface2);
+    border: 1px solid var(--kg-border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .metric-label { font-size: 11px; color: var(--kg-text-muted); margin-bottom: 6px; }
+  .metric-val { font-size: 22px; font-weight: 700; color: var(--kg-blue-light); }
+  .metric-unit { font-size: 11px; color: var(--kg-text-muted); }
+
+  /* ── FAIXAS TABLE ── */
+  .faixas-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .faixas-table th {
+    background: var(--kg-surface3);
+    padding: 8px 10px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--kg-text-muted);
+    border: 1px solid var(--kg-border);
+  }
+  .faixas-table th:first-child { text-align: left; width: 100px; }
+  .faixas-table td {
+    padding: 7px 10px;
+    text-align: center;
+    border: 1px solid var(--kg-border);
+    transition: background .15s;
+  }
+  .faixas-table td:first-child { text-align: left; font-weight: 600; }
+  .faixas-table tr:hover td { background: rgba(45,107,228,0.07); }
+  .faixa-badge {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .f1 { background: rgba(74,132,240,0.2); color: #7baaf5; }
+  .f2 { background: rgba(45,107,228,0.2); color: #5b8fe8; }
+  .f3 { background: rgba(240,180,41,0.2); color: #f0c055; }
+  .f4 { background: rgba(224,125,45,0.2); color: #e89050; }
+  .f5 { background: rgba(224,92,92,0.2); color: #e07070; }
+  .faixas-table .total-row td {
+    background: rgba(45,107,228,0.08);
+    font-weight: 600;
+    color: var(--kg-text);
+  }
+
+  /* ── CHART ── */
+  .chart-wrap { position: relative; height: 260px; margin: 4px 0; }
+
+  /* ── RESULTS TABLE (praticáveis) ── */
+  .prat-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .prat-table th {
+    background: var(--kg-surface3);
+    padding: 8px 10px;
+    text-align: center;
+    font-size: 11px; color: var(--kg-text-muted);
+    border: 1px solid var(--kg-border);
+  }
+  .prat-table th:first-child { text-align: left; min-width: 180px; }
+  .prat-table td {
+    padding: 7px 10px;
+    text-align: center;
+    border: 1px solid var(--kg-border);
+  }
+  .prat-table td:first-child { text-align: left; }
+  .prat-table tr:hover td { background: rgba(45,107,228,0.07); }
+  .prat-total { font-weight: 700; color: var(--kg-blue-light); }
+  .prat-service-name { font-size: 12px; }
+
+  /* cell color scale */
+  .c-hi { background: rgba(45,212,160,0.12); color: #5ae8c0; font-weight:600; }
+  .c-md { background: rgba(240,180,41,0.10); color: #d4a835; }
+  .c-lo { background: rgba(224,92,92,0.12); color: #d97070; }
+
+  /* ── MEMORIA DE CALCULO ── */
+  .memo {
+    background: var(--kg-surface2);
+    border-left: 3px solid var(--kg-blue);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: 14px 16px;
+    font-size: 12px;
+    color: var(--kg-text-muted);
+    line-height: 1.8;
+    margin-top: 4px;
+  }
+  .memo strong { color: var(--kg-text); }
+
+  /* ── DIVIDER ── */
+  .divider { height: 1px; background: var(--kg-border); margin: 20px 0; }
+
+  /* ── TABS ── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab-btn {
+    background: var(--kg-surface2);
+    border: 1px solid var(--kg-border);
+    border-radius: var(--radius-sm);
+    color: var(--kg-text-muted);
+    padding: 7px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .tab-btn.active { background: var(--kg-blue); border-color: var(--kg-blue); color: #fff; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── ERROR / WARNING ── */
+  .alert {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  .alert-warn { background: rgba(240,180,41,0.1); border: 1px solid rgba(240,180,41,0.3); color: var(--kg-warning); }
+  .alert-err { background: rgba(224,92,92,0.1); border: 1px solid rgba(224,92,92,0.3); color: var(--kg-danger); }
+  .alert-info { background: rgba(45,107,228,0.1); border: 1px solid var(--kg-border-bright); color: var(--kg-blue-light); }
+
+  /* ── RESPONSIVE ── */
+  @media(max-width:640px){
+    .jornada-grid { grid-template-columns: 1fr 1fr; }
+    .fer-table th:nth-child(n+3), .fer-table td:nth-child(n+3) { display: none; }
+    .faixas-table th:nth-child(n+8), .faixas-table td:nth-child(n+8) { display: none; }
+    .prat-table th:nth-child(n+8), .prat-table td:nth-child(n+8) { display: none; }
+    .jornada-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--kg-navy); }
+  ::-webkit-scrollbar-thumb { background: var(--kg-blue-dim); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo-box">KG</div>
+  <div>
+    <div class="header-name">Kauê Gutierres</div>
+    <div class="header-sub">Consultoria &amp; Gestão de Projetos de Infraestrutura</div>
+  </div>
+  <div class="header-right">
+    <span class="badge-api">Open-Meteo · ERA5</span>
+    <span style="font-size:11px;">Calculadora de Praticabilidade</span>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- ════ STEP 1 — LOCALIDADE ════ -->
+  <div class="card">
+    <div class="card-title"><span class="step-num">1</span> Localidade</div>
+    <div class="field-row">
+      <div class="field" style="flex:2; min-width:220px;">
+        <label>Cidade / Município</label>
+        <div class="search-wrap">
+          <input type="text" id="cityInput" placeholder="Digite o nome da cidade..." autocomplete="off">
+          <span class="search-icon">🔍</span>
+          <div id="cityDropdown"></div>
+        </div>
+      </div>
+      <div class="field" style="flex:1; min-width:140px;">
+        <label>Anos de histórico</label>
+        <select id="yearsBack">
+          <option value="5">Últimos 5 anos</option>
+          <option value="8" selected>Últimos 8 anos</option>
+          <option value="10">Últimos 10 anos</option>
+          <option value="15">Últimos 15 anos</option>
+        </select>
+      </div>
+    </div>
+    <div id="stationTag" style="display:none;" class="station-tag">
+      <span class="station-dot"></span>
+      <span id="stationName"></span>
+    </div>
+  </div>
+
+  <!-- ════ STEP 2 — FERIADOS ════ -->
+  <div class="card">
+    <div class="card-title"><span class="step-num">2</span> Calendário — Feriados por mês</div>
+    <div style="font-size:11px;color:var(--kg-text-muted);margin-bottom:12px;">
+      Informe a quantidade de feriados não trabalhados em cada mês. Sábados e domingos são configurados pela jornada.
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="fer-table" id="ferTable">
+        <thead>
+          <tr>
+            <th>Mês</th>
+            <th>Feriados</th>
+            <th>Sábados NTP</th>
+            <th>Domingos NTP</th>
+          </tr>
+        </thead>
+        <tbody id="ferBody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--kg-text-muted);">
+      * NTP = não trabalhados. Sábados/Domingos são calculados automaticamente pelo calendário.
+    </div>
+  </div>
+
+  <!-- ════ STEP 3 — SERVIÇOS ════ -->
+  <div class="card">
+    <div class="card-title"><span class="step-num">3</span> Tipo de Serviço</div>
+    <div class="service-grid" id="serviceGrid"></div>
+  </div>
+
+  <!-- ════ STEP 4 — PERÍODO + JORNADA ════ -->
+  <div class="card">
+    <div class="card-title"><span class="step-num">4</span> Período da Obra &amp; Jornada</div>
+    <div class="periodo-wrap" style="margin-bottom:18px;">
+      <div class="field">
+        <label>Data início</label>
+        <input type="text" id="dtInicio" placeholder="MM/AAAA" maxlength="7">
+      </div>
+      <div class="field">
+        <label>Data fim</label>
+        <input type="text" id="dtFim" placeholder="MM/AAAA" maxlength="7">
+      </div>
+      <div class="field">
+        <label>Horas produtivas / dia</label>
+        <input type="number" id="horasDia" value="8" min="4" max="24" step="0.5">
+      </div>
+    </div>
+    <div class="card-title" style="margin-bottom:12px;"><span style="font-size:11px;color:var(--kg-text-muted);font-weight:400;letter-spacing:0;">Jornada — Regime de trabalho</span></div>
+    <div class="jornada-grid" id="jornadaGrid">
+      <div class="jornada-opt active" data-sab="1" data-dom="1" onclick="selectJornada(this)">
+        <div class="jh">5×8h</div>
+        <div class="jl">Seg–Sex / 8h</div>
+        <div class="jl" style="margin-top:3px;">Sáb e Dom livres</div>
+      </div>
+      <div class="jornada-opt" data-sab="0" data-dom="1" onclick="selectJornada(this)">
+        <div class="jh">6×8h</div>
+        <div class="jl">Seg–Sáb / 8h</div>
+        <div class="jl" style="margin-top:3px;">Dom livre</div>
+      </div>
+      <div class="jornada-opt" data-sab="0" data-dom="0" onclick="selectJornada(this)">
+        <div class="jh">7×8h</div>
+        <div class="jl">Seg–Dom / 8h</div>
+        <div class="jl" style="margin-top:3px;">Sem folgas</div>
+      </div>
+      <div class="jornada-opt custom" data-sab="1" data-dom="1" onclick="selectJornada(this)">
+        <div class="jh">✎</div>
+        <div class="jl">Personalizado</div>
+        <div class="jl" style="margin-top:3px;">Editar tabela</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CALCULAR -->
+  <button class="btn-calc" id="btnCalc" onclick="calcular()">
+    ⚡ Calcular Praticabilidade
+  </button>
+
+  <!-- PROGRESS -->
+  <div class="card progress-area" id="progressArea" style="margin-top:18px;">
+    <div class="card-title">Processando...</div>
+    <div class="progress-steps" id="progressSteps"></div>
+  </div>
+
+  <!-- ════ RESULTS ════ -->
+  <div id="results">
+    <div class="divider"></div>
+
+    <!-- header result -->
+    <div class="result-header">
+      <div>
+        <div class="result-title">📊 Análise de Praticabilidade</div>
+        <div class="result-sub" id="resultSubtitle"></div>
+      </div>
+    </div>
+
+    <!-- métricas resumo -->
+    <div class="metrics" id="metricsRow"></div>
+
+    <!-- abas -->
+    <div class="tabs" id="resultTabs"></div>
+
+    <!-- TAB: Faixas de chuva -->
+    <div class="tab-panel active" id="tab-faixas">
+      <div class="card">
+        <div class="card-title">Número médio de dias de chuva por faixa</div>
+        <div style="overflow-x:auto;">
+          <table class="faixas-table" id="faixasTable"></table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Precipitação média mensal (mm/mês)</div>
+        <div class="chart-wrap">
+          <canvas id="chuvaChart" role="img" aria-label="Gráfico de precipitação média mensal em mm">Precipitação média mensal por mês.</canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Dias praticáveis -->
+    <div class="tab-panel" id="tab-prat">
+      <div class="card">
+        <div class="card-title">Dias praticáveis por serviço e mês</div>
+        <div style="overflow-x:auto;">
+          <table class="prat-table" id="pratTable"></table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Dias praticáveis — comparativo mensal</div>
+        <div class="chart-wrap" id="pratChartWrap">
+          <canvas id="pratChart" role="img" aria-label="Dias praticáveis por serviço ao longo dos meses">Dias praticáveis por serviço.</canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Calendário obra -->
+    <div class="tab-panel" id="tab-obra">
+      <div class="card">
+        <div class="card-title">Cronograma de praticabilidade da obra</div>
+        <div id="obraTable"></div>
+      </div>
+    </div>
+
+    <!-- TAB: Memória -->
+    <div class="tab-panel" id="tab-memo">
+      <div class="card">
+        <div class="card-title">Memória de cálculo</div>
+        <div class="memo" id="memoContent"></div>
+      </div>
+    </div>
+
+    <!-- alertas -->
+    <div id="alertsArea"></div>
+  </div><!-- /results -->
+
+</div><!-- /app -->
+
+<script>
+// ══════════════════════════════════════════════
+//  GLOBALS
+// ══════════════════════════════════════════════
+const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DAYS_IN_MONTH = [31,28,31,30,31,30,31,31,30,31,30,31]; // base (Feb ajustado)
+
+const SERVICES = [
+  { id:'terra',   name:'Movimento de Terra',           icon:'🪨' },
+  { id:'formas',  name:'Formas / Armação / Escor.',    icon:'🏗️' },
+  { id:'concreto',name:'Concreto',                     icon:'🧱' },
+  { id:'pav',     name:'Pavimentação',                 icon:'🛣️' },
+  { id:'metalica',name:'Montagem Estrutura Metálica',  icon:'⚙️' },
+  { id:'livre',   name:'Ativ. Não Impactadas pela Chuva', icon:'✅' },
+];
+
+// Fatores de retomada fixos por serviço e faixa
+// Chave: [F5_10, F10_20, F_gt20]
+const FATORES = {
+  terra:    [1.20, 1.60, 2.00],
+  formas:   [0.00, 0.50, 0.50],
+  concreto: [0.00, 0.90, 0.90],
+  pav:      [1.40, 1.40, 1.40],
+  metalica: [0.50, 0.50, 0.50],
+  livre:    [0.00, 0.00, 0.00],
+};
+
+let selectedCity = null;
+let jornadaSab = 1; // sábados NTP (1=sim, 0=não)
+let jornadaDom = 1;
+let chartChuva = null;
+let chartPrat = null;
+let lastPrecipMap = null;
+let lastApiUrl = null;
+
+// ══════════════════════════════════════════════
+//  INIT — tabela de feriados + serviços
+// ══════════════════════════════════════════════
+function initUI() {
+  // feriados
+  const tbody = document.getElementById('ferBody');
+  tbody.innerHTML = MONTHS_FULL.map((m,i) => `
+    <tr>
+      <td>${m}</td>
+      <td><input class="fer-num" type="number" id="fer_${i}" value="0" min="0" max="10"></td>
+      <td><input class="fer-num" id="sab_${i}" type="number" value="" min="0" max="5" placeholder="auto"></td>
+      <td><input class="fer-num" id="dom_${i}" type="number" value="" min="0" max="5" placeholder="auto"></td>
+    </tr>
+  `).join('');
+
+  // serviços
+  const sg = document.getElementById('serviceGrid');
+  sg.innerHTML = SERVICES.map(s => `
+    <div class="service-opt active" data-id="${s.id}" onclick="toggleService(this)">
+      <div class="service-cb"><span class="service-cb-check">✓</span></div>
+      <span class="service-name">${s.icon} ${s.name}</span>
+    </div>
+  `).join('');
+
+  // periodo padrão
+  const now = new Date();
+  document.getElementById('dtInicio').value = `${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
+  const fim = new Date(now.getFullYear()+1, now.getMonth(), 1);
+  document.getElementById('dtFim').value = `${String(fim.getMonth()+1).padStart(2,'0')}/${fim.getFullYear()}`;
+}
+
+// ══════════════════════════════════════════════
+//  CITY SEARCH
+// ══════════════════════════════════════════════
+let searchTimer = null;
+document.getElementById('cityInput').addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  const q = this.value.trim();
+  if (q.length < 2) { closeDropdown(); return; }
+  searchTimer = setTimeout(() => searchCity(q), 350);
+});
+document.getElementById('cityInput').addEventListener('blur', () => setTimeout(closeDropdown, 200));
+
+async function searchCity(q) {
+  try {
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=pt&format=json&countryCode=BR`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const results = (data.results || []).filter(r => r.country_code === 'BR');
+    showDropdown(results);
+  } catch(e) {
+    closeDropdown();
+  }
+}
+
+function showDropdown(results) {
+  const dd = document.getElementById('cityDropdown');
+  if (!results.length) { closeDropdown(); return; }
+  dd.innerHTML = results.map(r => `
+    <div class="city-item" onclick="selectCity(${r.latitude},${r.longitude},'${escHtml(r.name)}','${escHtml(r.admin1||'')}')">
+      <div class="city-item-name">${r.name}</div>
+      <div class="city-item-sub">${r.admin1 || ''} · ${r.admin2 || ''} · Brasil</div>
+    </div>
+  `).join('');
+  dd.style.display = 'block';
+}
+
+function closeDropdown() {
+  document.getElementById('cityDropdown').style.display = 'none';
+}
+
+function selectCity(lat, lon, name, state) {
+  selectedCity = { lat, lon, name, state };
+  document.getElementById('cityInput').value = `${name} — ${state}`;
+  closeDropdown();
+  const tag = document.getElementById('stationTag');
+  document.getElementById('stationName').textContent = `Lat ${lat.toFixed(4)}, Lon ${lon.toFixed(4)} · Dados ERA5/Open-Meteo`;
+  tag.style.display = 'inline-flex';
+}
+
+function escHtml(s) { return s.replace(/'/g,"&#39;").replace(/"/g,'&quot;'); }
+
+// ══════════════════════════════════════════════
+//  JORNADA
+// ══════════════════════════════════════════════
+function selectJornada(el) {
+  document.querySelectorAll('.jornada-opt').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  jornadaSab = parseInt(el.dataset.sab);
+  jornadaDom = parseInt(el.dataset.dom);
+  autoFillSabDom();
+}
+
+// ══════════════════════════════════════════════
+//  SERVICE TOGGLE
+// ══════════════════════════════════════════════
+function toggleService(el) {
+  el.classList.toggle('active');
+}
+
+// ══════════════════════════════════════════════
+//  DIAS NO MÊS
+// ══════════════════════════════════════════════
+function diasNoMes(mes, ano) {
+  if (mes === 1) { // Feb
+    return ((ano%4===0&&ano%100!==0)||ano%400===0) ? 29 : 28;
+  }
+  return DAYS_IN_MONTH[mes];
+}
+
+// Conta sábados/domingos em um mês/ano
+function contaSabDom(mes, ano) {
+  let sabs = 0, doms = 0;
+  const d = new Date(ano, mes, 1);
+  while (d.getMonth() === mes) {
+    const dw = d.getDay();
+    if (dw === 6) sabs++;
+    if (dw === 0) doms++;
+    d.setDate(d.getDate()+1);
+  }
+  return { sabs, doms };
+}
+
+function autoFillSabDom() {
+  // Para a tabela de feriados, preencher sab/dom com valores do ano atual baseado na jornada
+  const ano = new Date().getFullYear();
+  for (let i=0; i<12; i++) {
+    const { sabs, doms } = contaSabDom(i, ano);
+    const sabEl = document.getElementById(`sab_${i}`);
+    const domEl = document.getElementById(`dom_${i}`);
+    if (jornadaSab) {
+      sabEl.value = sabs;
+      sabEl.style.opacity = '0.6';
+    } else {
+      sabEl.value = 0;
+      sabEl.style.opacity = '0.6';
+    }
+    if (jornadaDom) {
+      domEl.value = doms;
+      domEl.style.opacity = '0.6';
+    } else {
+      domEl.value = 0;
+      domEl.style.opacity = '0.6';
+    }
+  }
+}
+
+// ══════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════
+function showTab(id) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-'+id));
+}
+
+// ══════════════════════════════════════════════
+//  FETCH OPEN-METEO
+// ══════════════════════════════════════════════
+async function fetchPrecip(lat, lon, startYear, endYear) {
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${startYear}-01-01&end_date=${endYear}-12-31&daily=precipitation_sum&timezone=America%2FSao_Paulo`;
+  lastApiUrl = url;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Open-Meteo: ${res.status}`);
+  const data = await res.json();
+  const map = {};
+  data.daily.time.forEach((d, i) => {
+    map[d] = data.daily.precipitation_sum[i] ?? 0;
+  });
+  lastPrecipMap = map;
+  return map;
+}
+
+function exportCSV() {
+  if (!lastPrecipMap) return;
+  const city = selectedCity ? `${selectedCity.name}_${selectedCity.state}` : 'cidade';
+  const header = 'Data,Precipitacao_mm,Faixa\n';
+  const faixaLabel = ['0mm','<5mm','5-10mm','10-20mm','20-30mm','>30mm'];
+  const rows = Object.entries(lastPrecipMap)
+    .sort(([a],[b]) => a.localeCompare(b))
+    .map(([date, mm]) => `${date},${(mm||0).toFixed(1)},${faixaLabel[classifyRain(mm||0)]}`)
+    .join('\n');
+  const blob = new Blob([header + rows], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `precipitacao_${city.replace(/\s/g,'_')}_ERA5.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ══════════════════════════════════════════════
+//  CLASSIFICAR FAIXA
+// ══════════════════════════════════════════════
+function classifyRain(mm) {
+  if (mm <= 0) return 0;
+  if (mm < 5)  return 1;  // <5
+  if (mm < 10) return 2;  // 5–10
+  if (mm < 20) return 3;  // 10–20
+  if (mm < 30) return 4;  // 20–30
+  return 5;               // >30
+}
+
+// ══════════════════════════════════════════════
+//  CALCULAR
+// ══════════════════════════════════════════════
+async function calcular() {
+  if (!selectedCity) { alert('Por favor, selecione uma cidade primeiro.'); return; }
+
+  const servicos = [...document.querySelectorAll('.service-opt.active')].map(e => e.dataset.id);
+  if (!servicos.length) { alert('Selecione ao menos um serviço.'); return; }
+
+  const btn = document.getElementById('btnCalc');
+  btn.disabled = true;
+
+  const progArea = document.getElementById('progressArea');
+  progArea.style.display = 'block';
+  document.getElementById('results').style.display = 'none';
+
+  const steps = [
+    { id:'s1', label:'Buscando dados históricos de precipitação (Open-Meteo / ERA5)' },
+    { id:'s2', label:'Validando completude e montando matriz mensal' },
+    { id:'s3', label:'Calculando climatologia e faixas de chuva' },
+    { id:'s4', label:'Aplicando fatores de retomada e calendário' },
+    { id:'s5', label:'Gerando resultados' },
+  ];
+  const psEl = document.getElementById('progressSteps');
+  psEl.innerHTML = steps.map(s => `
+    <div class="prog-step" id="ps_${s.id}">
+      <div class="prog-icon wait" id="pi_${s.id}">◦</div>
+      <span>${s.label}</span>
+    </div>
+  `).join('');
+
+  function setStep(id, state) {
+    const el = document.getElementById(`pi_${id}`);
+    el.className = `prog-icon ${state}`;
+    el.textContent = state==='done' ? '✓' : state==='error' ? '✗' : state==='running' ? '…' : '◦';
+  }
+
+  try {
+    // ── S1: buscar dados
+    setStep('s1','running');
+    const yearsBack = parseInt(document.getElementById('yearsBack').value);
+    const endYear = new Date().getFullYear() - 1;
+    const startYear = endYear - yearsBack + 1;
+    const precipMap = await fetchPrecip(selectedCity.lat, selectedCity.lon, startYear, endYear);
+    setStep('s1','done');
+
+    // ── S2: montar matriz [ano][mes][dia]
+    setStep('s2','running');
+    await delay(100);
+    // matriz: {ano: {mes: {dia: mm}}}
+    const matrix = {};
+    const yearsUsed = [];
+    const yearsExcluded = [];
+
+    for (let y = startYear; y <= endYear; y++) {
+      matrix[y] = {};
+      let invalidMonths = 0;
+      for (let m = 0; m < 12; m++) {
+        const days = {};
+        const nd = diasNoMes(m, y);
+        let nullCount = 0;
+        for (let d = 1; d <= nd; d++) {
+          const key = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const v = precipMap[key];
+          if (v === null || v === undefined) { nullCount++; days[d] = 0; }
+          else days[d] = v;
+        }
+        // completude: se >10% nulos, mês inválido
+        const pct = 1 - (nullCount / nd);
+        if (pct < 0.9) {
+          invalidMonths++;
+          matrix[y][m] = null; // inválido
+        } else {
+          matrix[y][m] = days;
+        }
+      }
+      if (invalidMonths <= 1) {
+        yearsUsed.push(y);
+      } else {
+        yearsExcluded.push(y);
+        delete matrix[y];
+      }
+    }
+    setStep('s2','done');
+
+    // ── S3: faixas + climatologia
+    setStep('s3','running');
+    await delay(100);
+    // Para cada mês: contar dias por faixa em cada ano válido
+    // faixaCount[mes][faixa 1..5] = soma de dias em todos os anos válidos
+    const faixaCount = Array.from({length:12}, () => [0,0,0,0,0,0]); // idx 1..5
+    const faixaAnos  = Array.from({length:12}, () => 0); // quantos anos válidos por mês
+    const climTotal  = Array.from({length:12}, () => 0); // mm/mês médio
+    const climAnos   = Array.from({length:12}, () => 0);
+
+    for (const y of yearsUsed) {
+      for (let m = 0; m < 12; m++) {
+        const dias = matrix[y][m];
+        if (!dias) continue;
+        faixaAnos[m]++;
+        climAnos[m]++;
+        let mmMes = 0;
+        const nd = diasNoMes(m, y);
+        for (let d = 1; d <= 31; d++) {
+          const mm = d <= nd ? (dias[d] ?? 0) : 0;
+          mmMes += mm;
+          const f = classifyRain(mm);
+          if (f > 0) faixaCount[m][f]++;
+        }
+        climTotal[m] += mmMes;
+      }
+    }
+
+    // médias arredondadas
+    const faixaMedia = Array.from({length:12}, (_,m) => {
+      return [0,1,2,3,4,5].map(f => f===0 ? 0 : (faixaAnos[m] > 0 ? Math.round(faixaCount[m][f] / faixaAnos[m]) : 0));
+    });
+    const mmMesMedio = Array.from({length:12}, (_,m) => climAnos[m] > 0 ? climTotal[m]/climAnos[m] : 0);
+    setStep('s3','done');
+
+    // ── S4: fator calendário + dias praticáveis
+    setStep('s4','running');
+    await delay(100);
+
+    // Ler feriados da tabela — período da obra
+    const dtInicioStr = document.getElementById('dtInicio').value; // MM/AAAA
+    const dtFimStr    = document.getElementById('dtFim').value;
+
+    // Parse período
+    let periodoMeses = null; // [{mes, ano}]
+    if (dtInicioStr.match(/^\d{2}\/\d{4}$/) && dtFimStr.match(/^\d{2}\/\d{4}$/)) {
+      const [mi,yi] = dtInicioStr.split('/').map(Number);
+      const [mf,yf] = dtFimStr.split('/').map(Number);
+      periodoMeses = [];
+      let cm = mi-1, cy = yi;
+      while (cy < yf || (cy === yf && cm <= mf-1)) {
+        periodoMeses.push({mes: cm, ano: cy});
+        cm++; if (cm > 11) { cm = 0; cy++; }
+      }
+    }
+
+    // Fator calendário por mês (Jan..Dez — baseado no padrão)
+    // Usamos os feriados informados na tabela + sab/dom da jornada
+    const fCalMes = Array.from({length:12}, (_,m) => {
+      const ferro = parseInt(document.getElementById(`fer_${m}`).value) || 0;
+      const sabEl = document.getElementById(`sab_${m}`).value;
+      const domEl = document.getElementById(`dom_${m}`).value;
+      const baseYear = new Date().getFullYear();
+      const { sabs: totSabs, doms: totDoms } = contaSabDom(m, baseYear);
+      const sabNTP = sabEl !== '' ? parseInt(sabEl) : (jornadaSab ? totSabs : 0);
+      const domNTP = domEl !== '' ? parseInt(domEl) : (jornadaDom ? totDoms : 0);
+      const nd = diasNoMes(m, baseYear);
+      // evitar dupla contagem (simples — não temos lista de datas exatas)
+      const improd = Math.min(nd, sabNTP + domNTP + ferro);
+      return 1 - (improd / nd);
+    });
+
+    // Calcular dias praticáveis para cada serviço e mês
+    const horasDia = parseFloat(document.getElementById('horasDia').value) || 8;
+    const pratResult = {}; // {servicoId: [jan..dez]}
+    servicos.forEach(sid => {
+      const [f510, f1020, fgt20] = FATORES[sid];
+      pratResult[sid] = Array.from({length:12}, (_,m) => {
+        const nd = diasNoMes(m, new Date().getFullYear());
+        const N510  = faixaMedia[m][2];
+        const N1020 = faixaMedia[m][3];
+        const N2030 = faixaMedia[m][4];
+        const Ngt30 = faixaMedia[m][5];
+        const Ngt20 = N2030 + Ngt30;
+        const perda = N510*f510 + N1020*f1020 + Ngt20*fgt20;
+        const dias = Math.round((nd - perda) * fCalMes[m]);
+        return Math.max(0, dias);
+      });
+    });
+    setStep('s4','done');
+
+    // ── S5: render
+    setStep('s5','running');
+    await delay(50);
+    renderResults({
+      faixaMedia, mmMesMedio, pratResult, servicos,
+      fCalMes, yearsUsed, yearsExcluded, startYear, endYear,
+      horasDia, periodoMeses, faixaCount, faixaAnos
+    });
+    setStep('s5','done');
+
+    progArea.style.display = 'none';
+    document.getElementById('results').style.display = 'block';
+
+  } catch(err) {
+    setStep('s1','error');
+    progArea.innerHTML += `<div class="alert alert-err" style="margin-top:12px;">Erro: ${err.message}</div>`;
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ══════════════════════════════════════════════
+//  RENDER RESULTS
+// ══════════════════════════════════════════════
+function renderResults(d) {
+  const { faixaMedia, mmMesMedio, pratResult, servicos, fCalMes,
+          yearsUsed, yearsExcluded, startYear, endYear,
+          horasDia, periodoMeses, faixaCount, faixaAnos } = d;
+
+  // subtitle
+  document.getElementById('resultSubtitle').textContent =
+    `${selectedCity.name} — ${selectedCity.state} · ERA5 · Anos: ${yearsUsed.join(', ')}`;
+
+  // ── MÉTRICAS
+  const totalMmAno = mmMesMedio.reduce((a,b) => a+b, 0);
+  const mesMaisChuvoso = mmMesMedio.indexOf(Math.max(...mmMesMedio));
+  const mesMenoChuvoso = mmMesMedio.indexOf(Math.min(...mmMesMedio));
+  const diasChuvaAno = faixaMedia.reduce((a,m) => a + m[2]+m[3]+m[4]+m[5], 0);
+
+  document.getElementById('metricsRow').innerHTML = `
+    <div class="metric"><div class="metric-label">Precipitação anual média</div><div class="metric-val">${totalMmAno.toFixed(0)}<span class="metric-unit"> mm</span></div></div>
+    <div class="metric"><div class="metric-label">Dias com chuva ≥5mm/ano</div><div class="metric-val">${diasChuvaAno}<span class="metric-unit"> dias</span></div></div>
+    <div class="metric"><div class="metric-label">Mês mais chuvoso</div><div class="metric-val" style="font-size:16px;">${MONTHS[mesMaisChuvoso]}<span class="metric-unit"> · ${mmMesMedio[mesMaisChuvoso].toFixed(0)}mm</span></div></div>
+    <div class="metric"><div class="metric-label">Mês mais seco</div><div class="metric-val" style="font-size:16px;">${MONTHS[mesMenoChuvoso]}<span class="metric-unit"> · ${mmMesMedio[mesMenoChuvoso].toFixed(0)}mm</span></div></div>
+    <div class="metric"><div class="metric-label">Anos analisados</div><div class="metric-val">${yearsUsed.length}<span class="metric-unit"> anos</span></div></div>
+  `;
+
+  // ── TABS
+  document.getElementById('resultTabs').innerHTML = [
+    {id:'faixas', label:'Faixas de Chuva'},
+    {id:'prat',   label:'Dias Praticáveis'},
+    {id:'obra',   label:'Cronograma Obra'},
+    {id:'memo',   label:'Memória de Cálculo'},
+  ].map(t => `<button class="tab-btn ${t.id==='faixas'?'active':''}" data-tab="${t.id}" onclick="showTab('${t.id}')">${t.label}</button>`).join('');
+
+  // ── FAIXAS TABLE
+  const faixasLabels = ['< 5 mm','5 a 10 mm','10 a 20 mm','20 a 30 mm','> 30 mm'];
+  const faixaClasses = ['f1','f2','f3','f4','f5'];
+  let fTbl = `<thead><tr><th>Chuva</th>${MONTHS.map(m=>`<th>${m}</th>`).join('')}</tr></thead><tbody>`;
+  for (let f=1; f<=5; f++) {
+    fTbl += `<tr><td><span class="faixa-badge ${faixaClasses[f-1]}">${faixasLabels[f-1]}</span></td>`;
+    fTbl += MONTHS.map((_,m) => `<td>${faixaMedia[m][f]}</td>`).join('');
+    fTbl += `</tr>`;
+  }
+  // row total dias chuva
+  fTbl += `<tr class="total-row"><td>Total dias chuva</td>`;
+  fTbl += MONTHS.map((_,m) => `<td>${faixaMedia[m][2]+faixaMedia[m][3]+faixaMedia[m][4]+faixaMedia[m][5]}</td>`).join('');
+  fTbl += `</tr>`;
+  // row dias do mês
+  fTbl += `<tr class="total-row"><td>Dias/mês</td>`;
+  fTbl += MONTHS.map((_,m) => `<td>${DAYS_IN_MONTH[m]}</td>`).join('');
+  fTbl += `</tr>`;
+  // row mm/mês
+  fTbl += `<tr class="total-row"><td>mm/mês médio</td>`;
+  fTbl += MONTHS.map((_,m) => `<td>${mmMesMedio[m].toFixed(1)}</td>`).join('');
+  fTbl += `</tr></tbody>`;
+  document.getElementById('faixasTable').innerHTML = fTbl;
+
+  // ── CHART CHUVA
+  if (chartChuva) chartChuva.destroy();
+  chartChuva = new Chart(document.getElementById('chuvaChart'), {
+    type: 'bar',
+    data: {
+      labels: MONTHS,
+      datasets: [{
+        label: 'mm/mês',
+        data: mmMesMedio.map(v => +v.toFixed(1)),
+        backgroundColor: mmMesMedio.map(v =>
+          v > 150 ? 'rgba(224,92,92,0.7)' :
+          v > 100 ? 'rgba(240,180,41,0.7)' :
+          v > 50  ? 'rgba(45,107,228,0.7)' : 'rgba(45,107,228,0.4)'
+        ),
+        borderColor: '#2d6be4',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => `${c.parsed.y.toFixed(1)} mm` } }
+      },
+      scales: {
+        x: { ticks: { color: '#8fa3c8', font:{size:11} }, grid:{ color:'rgba(45,107,228,0.1)' } },
+        y: { ticks: { color: '#8fa3c8', font:{size:11}, callback: v => `${v}mm` }, grid:{ color:'rgba(45,107,228,0.1)' } }
+      }
+    }
+  });
+
+  // ── PRATICÁVEIS TABLE
+  const SVC_NAMES = Object.fromEntries(SERVICES.map(s=>[s.id,`${s.icon} ${s.name}`]));
+  const maxPrat = Math.max(...servicos.flatMap(sid => pratResult[sid]));
+  const minPrat = Math.min(...servicos.flatMap(sid => pratResult[sid]));
+
+  function pratColor(v) {
+    if (v >= maxPrat*0.85) return 'c-hi';
+    if (v <= minPrat*1.3 + 2) return 'c-lo';
+    return 'c-md';
+  }
+
+  let pTbl = `<thead><tr><th>Serviço</th>${MONTHS.map(m=>`<th>${m}</th>`).join('')}<th>Total</th></tr></thead><tbody>`;
+  servicos.forEach(sid => {
+    const row = pratResult[sid];
+    const total = row.reduce((a,b)=>a+b,0);
+    pTbl += `<tr><td class="prat-service-name">${SVC_NAMES[sid]||sid}</td>`;
+    pTbl += row.map(v => `<td class="${pratColor(v)}">${v}</td>`).join('');
+    pTbl += `<td class="prat-total">${total}</td></tr>`;
+  });
+  pTbl += `</tbody>`;
+  document.getElementById('pratTable').innerHTML = pTbl;
+
+  // ── CHART PRATICÁVEIS
+  if (chartPrat) chartPrat.destroy();
+  const COLORS = ['#4a84f0','#2dd4a0','#f0b429','#e07d2d','#e05c5c','#a78bfa'];
+  const DASHES = [[],[5,5],[3,3],[8,4],[2,4],[6,2]];
+  if (chartPrat) chartPrat.destroy();
+  chartPrat = new Chart(document.getElementById('pratChart'), {
+    type: 'line',
+    data: {
+      labels: MONTHS,
+      datasets: servicos.map((sid, i) => ({
+        label: SERVICES.find(s=>s.id===sid)?.name || sid,
+        data: pratResult[sid],
+        borderColor: COLORS[i % COLORS.length],
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        pointRadius: 4,
+        borderDash: DASHES[i % DASHES.length],
+        tension: 0.3,
+      }))
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { mode:'index', intersect:false }
+      },
+      scales: {
+        x: { ticks:{ color:'#8fa3c8', font:{size:11} }, grid:{ color:'rgba(45,107,228,0.1)' } },
+        y: { ticks:{ color:'#8fa3c8', font:{size:11}, callback: v => `${v}d` }, grid:{ color:'rgba(45,107,228,0.1)' } }
+      }
+    }
+  });
+  // tamanho dinâmico para legenda
+  const legendHtml = servicos.map((sid, i) => `
+    <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--kg-text-muted);">
+      <span style="width:24px;height:2px;background:${COLORS[i%COLORS.length]};display:inline-block;"></span>
+      ${SERVICES.find(s=>s.id===sid)?.name || sid}
+    </span>
+  `).join('');
+  document.getElementById('pratChartWrap').insertAdjacentHTML('beforebegin',
+    `<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;">${legendHtml}</div>`);
+
+  // ── OBRA TABLE
+  if (periodoMeses && periodoMeses.length > 0) {
+    let oTbl = `<div style="overflow-x:auto;"><table class="prat-table">
+      <thead><tr><th>Serviço</th>${periodoMeses.map(({mes,ano})=>`<th>${MONTHS[mes]}<br><span style="font-size:10px;color:var(--kg-text-muted);">${ano}</span></th>`).join('')}<th>Total</th><th>Horas</th></tr></thead><tbody>`;
+    servicos.forEach(sid => {
+      oTbl += `<tr><td class="prat-service-name">${SVC_NAMES[sid]||sid}</td>`;
+      let tot = 0;
+      periodoMeses.forEach(({mes, ano}) => {
+        // recalcular fator calendário para o ano específico
+        const nd = diasNoMes(mes, ano);
+        const ferro = parseInt(document.getElementById(`fer_${mes}`).value) || 0;
+        const sabEl = document.getElementById(`sab_${mes}`).value;
+        const domEl = document.getElementById(`dom_${mes}`).value;
+        const { sabs, doms } = contaSabDom(mes, ano);
+        const sabNTP = sabEl !== '' ? parseInt(sabEl) : (jornadaSab ? sabs : 0);
+        const domNTP = domEl !== '' ? parseInt(domEl) : (jornadaDom ? doms : 0);
+        const improd = Math.min(nd, sabNTP + domNTP + ferro);
+        const fCal = 1 - (improd / nd);
+        const [f510, f1020, fgt20] = FATORES[sid];
+        const N510  = faixaMedia[mes][2];
+        const N1020 = faixaMedia[mes][3];
+        const Ngt20 = faixaMedia[mes][4] + faixaMedia[mes][5];
+        const perda = N510*f510 + N1020*f1020 + Ngt20*fgt20;
+        const dias = Math.max(0, Math.round((nd - perda) * fCal));
+        tot += dias;
+        oTbl += `<td class="${pratColor(dias)}">${dias}</td>`;
+      });
+      const horas = Math.round(tot * horasDia);
+      oTbl += `<td class="prat-total">${tot}</td><td class="prat-total">${horas}h</td></tr>`;
+    });
+    oTbl += `</tbody></table></div>`;
+    document.getElementById('obraTable').innerHTML = oTbl;
+  } else {
+    document.getElementById('obraTable').innerHTML = `<div class="alert alert-info">Informe o período da obra para ver o cronograma detalhado.</div>`;
+  }
+
+  // ── MEMÓRIA
+  const fatorTabela = servicos.map(sid => {
+    const [f510,f1020,fgt20] = FATORES[sid];
+    const n = SERVICES.find(s=>s.id===sid)?.name || sid;
+    return `${n}: &gt;5mm→×${f510} | &gt;10mm→×${f1020} | &gt;20mm→×${fgt20}`;
+  }).join('<br>');
+
+  document.getElementById('memoContent').innerHTML = `
+    <strong>Fonte de dados:</strong> Open-Meteo ERA5 Reanalysis — precipitação diária<br>
+    <strong>Localização:</strong> ${selectedCity.name} — ${selectedCity.state} · Lat ${selectedCity.lat.toFixed(4)} / Lon ${selectedCity.lon.toFixed(4)}<br>
+    <strong>Janela histórica solicitada:</strong> ${startYear}–${endYear} (${parseInt(document.getElementById('yearsBack').value)} anos)<br>
+    <strong>Anos válidos utilizados:</strong> ${yearsUsed.join(', ')}<br>
+    ${yearsExcluded.length ? `<strong>Anos excluídos</strong> (>1 mês com dados insuficientes): ${yearsExcluded.join(', ')}<br>` : ''}
+    <strong>Critério de completude:</strong> mês válido se ≥90% dos dias com dados; ano válido se ≤1 mês inválido<br>
+    <br>
+    <strong>Classificação de faixas:</strong><br>
+    &nbsp;&nbsp;• &lt;5 mm → não impacta praticabilidade<br>
+    &nbsp;&nbsp;• 5–10 mm | 10–20 mm | 20–30 mm | &gt;30 mm<br>
+    <br>
+    <strong>Fatores de retomada aplicados:</strong><br>${fatorTabela}<br>
+    <br>
+    <strong>Fórmula:</strong> Praticáveis = ARRED( (Dias_mês − Perda_chuva) × F_calendário ; 0 )<br>
+    <strong>Jornada:</strong> ${horasDia}h produtivas/dia · Sáb NTP: ${jornadaSab?'sim':'não'} · Dom NTP: ${jornadaDom?'sim':'não'}<br>
+    <br>
+    <strong>Precipitação média anual:</strong> ${mmMesMedio.reduce((a,b)=>a+b,0).toFixed(1)} mm/ano<br>
+    <strong>Distribuição por mês:</strong> ${MONTHS.map((m,i)=>`${m}:${mmMesMedio[i].toFixed(0)}mm`).join(' | ')}<br>
+    <br>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;">
+      <a href="${lastApiUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:7px;background:rgba(45,107,228,0.15);border:1px solid rgba(45,107,228,0.5);color:#4a84f0;padding:7px 14px;border-radius:6px;font-size:12px;text-decoration:none;">
+        🔗 Acessar dados brutos (Open-Meteo API)
+      </a>
+      <button onclick="exportCSV()" style="display:inline-flex;align-items:center;gap:7px;background:rgba(45,212,160,0.12);border:1px solid rgba(45,212,160,0.35);color:#2dd4a0;padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer;">
+        ⬇ Exportar série histórica (.CSV)
+      </button>
+    </div>
+  `;
+
+  // alertas
+  document.getElementById('alertsArea').innerHTML = yearsExcluded.length
+    ? `<div class="alert alert-warn" style="margin-bottom:12px;">⚠️ ${yearsExcluded.length} ano(s) excluído(s) por completude insuficiente: ${yearsExcluded.join(', ')}. Resultados baseados em ${yearsUsed.length} ano(s).</div>`
+    : '';
+}
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+initUI();
+autoFillSabDom();
+</script>
+</body>
+</html>
