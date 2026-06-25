@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auditor DCMA 14 Pontos – KG Consultoria</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* ══════════════════════════════════════════
+   TOKENS
+══════════════════════════════════════════ */
+:root {
+  /* dark nav */
+  --nav-bg: #0d1624;
+  --nav-border: rgba(255,255,255,.07);
+  /* page */
+  --bg: #f0f3f9;
+  --bg-card: #ffffff;
+  --bg-header: #0f2140;
+  /* text */
+  --text: #1a2035;
+  --text-muted: #5a6480;
+  /* accent */
+  --accent: #2563eb;
+  --accent-hover: #1d50c8;
+  --accent-light: #eff4ff;
+  --accent2: #00b37e;
+  /* states */
+  --danger: #dc2626;
+  --warn: #d97706;
+  --pass-bg: #ecfdf5; --pass-border: #10b981; --pass-text: #065f46;
+  --fail-bg: #fef2f2; --fail-border: #ef4444; --fail-text: #7f1d1d;
+  --na-bg: #f3f4f6;   --na-border: #9ca3af;   --na-text: #4b5563;
+  --border: #dde3ef;
+  --shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.05);
+  --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 15px; }
+
+/* ══ TOPNAV ══ */
+.topnav {
+  position: sticky; top: 0; z-index: 200;
+  background: var(--nav-bg);
+  border-bottom: 1px solid var(--nav-border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1.6rem; height: 52px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.nav-left { display: flex; align-items: center; gap: .85rem; }
+.nav-avatar {
+  width: 32px; height: 32px; border-radius: 7px;
+  background: linear-gradient(135deg,#2563eb,#1d50c8);
+  color: #fff; font-size: .7rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  letter-spacing: .02em; flex-shrink: 0;
+}
+.nav-name  { font-size: .82rem; font-weight: 700; color: #fff; line-height: 1.2; }
+.nav-sub   { font-size: .7rem; color: rgba(255,255,255,.45); }
+.nav-divider { width: 1px; height: 22px; background: var(--nav-border); margin: 0 .2rem; }
+.nav-right { display: flex; align-items: center; gap: .5rem; }
+.nav-pill {
+  font-size: .72rem; font-weight: 600; padding: .3rem .85rem;
+  border-radius: 20px; border: 1px solid rgba(255,255,255,.14);
+  color: rgba(255,255,255,.7); background: rgba(255,255,255,.06);
+  cursor: pointer; white-space: nowrap; transition: all .15s;
+}
+.nav-pill:hover, .nav-pill.active { background: rgba(255,255,255,.14); color: #fff; border-color: rgba(255,255,255,.25); }
+.nav-pill.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.nav-pill.primary:hover { background: var(--accent-hover); }
+
+/* ══ HOME HERO ══ */
+.home-hero {
+  background: linear-gradient(160deg, #0d1624 0%, #0f2140 55%, #162b5a 100%);
+  padding: 3rem 2rem 2.5rem;
+  text-align: center;
+  position: relative; overflow: hidden;
+}
+.home-hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 70% 60% at 50% 0%, rgba(37,99,235,.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: rgba(255,255,255,.5); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 20px; padding: .25rem .85rem; margin-bottom: 1.1rem;
+}
+.hero-badge span { color: #60a5fa; }
+.home-hero h1 { font-size: 1.85rem; font-weight: 800; color: #fff; letter-spacing: -.02em; margin-bottom: .4rem; }
+.home-hero p  { font-size: .9rem; color: rgba(255,255,255,.55); max-width: 480px; margin: 0 auto; }
+
+/* ══ HOME BODY ══ */
+.home-body { max-width: 1080px; margin: 0 auto; padding: 1.8rem 1.5rem 4rem; }
+.home-grid { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; }
+
+/* project panel */
+.glass-panel {
+  background: rgba(255,255,255,.98);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.panel-head {
+  padding: .75rem 1.1rem;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: #f7f9fd;
+}
+.panel-head-title { font-size: .82rem; font-weight: 700; color: var(--bg-header); display: flex; align-items: center; gap: .4rem; }
+.panel-head button {
+  font-size: .72rem; font-weight: 700; padding: .28rem .7rem;
+  border-radius: 6px; border: 1.5px solid var(--border);
+  background: #fff; color: var(--accent); cursor: pointer;
+}
+.panel-head button:hover { background: var(--accent-light); }
+
+.proj-list { list-style: none; max-height: 480px; overflow-y: auto; }
+.proj-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .8rem 1.1rem; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background .12s;
+}
+.proj-item:last-child { border-bottom: none; }
+.proj-item:hover { background: #f5f8ff; }
+.proj-item.selected { background: var(--accent-light); }
+.proj-item-left { flex: 1; min-width: 0; }
+.proj-name { font-weight: 700; font-size: .88rem; color: var(--bg-header); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.proj-meta { font-size: .74rem; color: var(--text-muted); margin-top: 2px; }
+.proj-score-badge {
+  font-size: .82rem; font-weight: 800; padding: .2rem .6rem;
+  border-radius: 8px; flex-shrink: 0; margin-left: .6rem;
+}
+.score-low  { background: #ecfdf5; color: #065f46; }
+.score-mid  { background: #fffbeb; color: #92400e; }
+.score-high { background: #fef2f2; color: #7f1d1d; }
+.score-na   { background: #f3f4f6; color: #6b7280; }
+.proj-del {
+  font-size: .68rem; padding: 2px 6px; border-radius: 4px;
+  border: 1px solid transparent; background: transparent; color: transparent;
+  cursor: pointer; margin-left: .3rem; transition: all .12s;
+}
+.proj-item:hover .proj-del { border-color: #fca5a5; color: #ef4444; background: #fef2f2; }
+.proj-empty { padding: 2.5rem 1.5rem; text-align: center; color: var(--text-muted); font-size: .85rem; }
+
+/* upload panel */
+.up-body { padding: 1.1rem; }
+.up-field-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin-bottom: .3rem; }
+.up-input {
+  width: 100%; border: 1.5px solid var(--border); border-radius: 7px;
+  padding: .48rem .75rem; font-size: .88rem; color: var(--text);
+  background: #fff; margin-bottom: .85rem; transition: border-color .15s;
+}
+.up-input:focus { outline: none; border-color: var(--accent); }
+.drop-zone {
+  border: 2px dashed var(--accent); border-radius: 10px;
+  padding: 1.4rem 1rem; text-align: center; cursor: pointer;
+  background: var(--accent-light); margin-bottom: .85rem; transition: background .15s;
+}
+.drop-zone:hover { background: #dbeafe; }
+.drop-zone input { display: none; }
+.drop-icon  { font-size: 1.6rem; margin-bottom: .3rem; }
+.drop-label { font-size: .83rem; font-weight: 700; color: var(--accent); }
+.drop-hint  { font-size: .72rem; color: var(--text-muted); margin-top: .2rem; }
+.fmt-pills  { display: flex; gap: .3rem; flex-wrap: wrap; margin-bottom: .85rem; }
+.fmt-pill   { background: var(--accent-light); color: var(--accent); font-size: .7rem; font-weight: 700; padding: 2px 9px; border-radius: 20px; }
+.up-err { color: var(--danger); font-size: .8rem; min-height: 1em; margin-bottom: .4rem; }
+.up-msg { color: var(--text-muted); font-size: .78rem; min-height: 1em; margin-bottom: .4rem; }
+.up-btn {
+  width: 100%; background: var(--accent); color: #fff;
+  border: none; padding: .6rem; border-radius: 8px;
+  font-size: .9rem; font-weight: 700; cursor: pointer; display: none;
+  transition: background .15s;
+}
+.up-btn:hover { background: var(--accent-hover); }
+
+/* ══ HISTORY TABLE ══ */
+.hist-wrap { margin-top: 1.25rem; }
+.hist-wrap .panel-head { background: #0f2140; }
+.hist-wrap .panel-head-title { color: #fff; }
+.hist-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.hist-table th {
+  padding: .5rem 1rem; text-align: left; font-size: .71rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+  background: #f7f9fd; color: var(--text-muted); border-bottom: 1px solid var(--border);
+}
+.hist-table td { padding: .5rem 1rem; border-bottom: 1px solid #f0f2f7; color: var(--text); }
+.hist-table tr:last-child td { border-bottom: none; }
+.hist-table tr:hover td { background: #f5f8ff; }
+.hist-score { font-weight: 800; }
+.hist-open { font-size: .72rem; padding: 3px 9px; border-radius: 5px; border: 1.5px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; font-weight: 700; }
+.hist-open:hover { background: var(--accent); color: #fff; }
+.hist-del  { font-size: .72rem; padding: 3px 7px; border-radius: 5px; border: 1px solid #e5e7eb; color: #9ca3af; background: #fff; cursor: pointer; margin-left: .25rem; }
+.hist-del:hover  { background: #fef2f2; color: var(--danger); border-color: #fca5a5; }
+.diff-up   { color: #10b981; font-weight: 700; }
+.diff-down { color: var(--danger); font-weight: 700; }
+.diff-eq   { color: var(--text-muted); }
+
+/* ══ REPORT SCREEN ══ */
+#report-screen { display: none; }
+
+/* report header */
+.report-header {
+  background: linear-gradient(160deg, #0d1624 0%, #0f2140 60%, #162b5a 100%);
+  color: #fff; padding: 2.5rem 3rem 2rem;
+  position: relative; overflow: hidden;
+}
+.report-header::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 60% 80% at 0% 50%, rgba(37,99,235,.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.report-header h1 { font-size: 2rem; font-weight: 800; margin-bottom: .3rem; letter-spacing: -.02em; }
+.report-header .dates-row { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 1rem; font-size: .9rem; opacity: .85; }
+.report-header .date-item span:first-child { opacity: .55; font-size: .75rem; display: block; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 1px; }
+
+/* score section */
+.score-section {
+  background: linear-gradient(135deg, #1e3a6e 0%, #0f2140 100%);
+  color: #fff; padding: 2rem 3rem;
+  display: flex; align-items: center; gap: 3rem; flex-wrap: wrap;
+}
+.score-circle {
+  width: 130px; height: 130px; border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-weight: 700; flex-shrink: 0; border: 6px solid rgba(255,255,255,.15);
+}
+.score-circle .num { font-size: 2.6rem; line-height: 1; }
+.score-circle .lbl { font-size: .75rem; opacity: .6; margin-top: 2px; }
+.score-desc { flex: 1; min-width: 220px; }
+.score-desc h2 { font-size: 1.3rem; margin-bottom: .5rem; }
+.score-desc p  { font-size: .9rem; opacity: .75; line-height: 1.6; }
+.score-meta { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 1rem; }
+.score-meta .sm { font-size: .82rem; opacity: .65; }
+.score-meta .sm b { opacity: 1; }
+.risk-badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: .82rem; font-weight: 700; margin-top: .6rem; }
+.risk-alto  { background: #dc2626; color: #fff; }
+.risk-medio { background: #d97706; color: #fff; }
+.risk-baixo { background: #10b981; color: #fff; }
+
+/* compare bar */
+.compare-bar {
+  background: #162b5a; color: #fff;
+  padding: .5rem 3rem; font-size: .82rem;
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.compare-bar .cb-item { opacity: .75; }
+.compare-bar .cb-item b { opacity: 1; }
+
+/* report body */
+.report-body { max-width: 1100px; margin: 0 auto; padding: 2rem 2rem 4rem; }
+.toolbar {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;
+}
+.toolbar input[type=text] {
+  flex: 1; min-width: 200px; border: 1.5px solid var(--border); border-radius: 8px;
+  padding: .5rem .9rem; font-size: .9rem; color: var(--text); background: #fff;
+}
+.toolbar input[type=text]:focus { outline: none; border-color: var(--accent); }
+.toolbar button {
+  padding: .5rem 1.1rem; border-radius: 8px; border: 1.5px solid var(--border);
+  background: #fff; cursor: pointer; font-size: .85rem; font-weight: 600; color: var(--text); transition: background .15s;
+}
+.toolbar button:hover { background: #eff4ff; }
+.toolbar button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+#btn-top {
+  position: fixed; bottom: 2rem; right: 2rem; width: 44px; height: 44px;
+  border-radius: 50%; background: var(--accent); color: #fff;
+  border: none; cursor: pointer; font-size: 1.4rem;
+  display: none; align-items: center; justify-content: center;
+  box-shadow: 0 3px 16px rgba(37,99,235,.4); z-index: 999;
+}
+.section-title {
+  font-size: 1.05rem; font-weight: 700; color: var(--bg-header);
+  border-left: 4px solid var(--accent); padding-left: .8rem; margin: 2rem 0 1rem;
+}
+.exec-card {
+  background: var(--bg-card); border-radius: var(--radius); border: 1px solid var(--border);
+  padding: 1.4rem 1.6rem; box-shadow: var(--shadow); margin-bottom: 1.2rem;
+}
+.exec-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: .8rem; }
+.top-causes li { margin: .3rem 0 .3rem 1.2rem; font-size: .9rem; color: var(--text-muted); }
+.top-causes li span { color: var(--danger); font-weight: 700; }
+.action-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap: 1rem; margin-top: 1rem; }
+.action-item {
+  border-radius: 8px; padding: 1rem; border-left: 4px solid;
+  background: #fff; border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+.action-item.alta  { border-left-color: var(--danger); }
+.action-item.media { border-left-color: var(--warn); }
+.action-item.baixa { border-left-color: var(--accent2); }
+.action-item .pri  { font-size: .72rem; font-weight: 700; text-transform: uppercase; margin-bottom: .3rem; letter-spacing: .04em; }
+.action-item.alta .pri  { color: var(--danger); }
+.action-item.media .pri { color: var(--warn); }
+.action-item.baixa .pri { color: var(--accent2); }
+.action-item p { font-size: .85rem; color: var(--text-muted); line-height: 1.5; }
+.criteria-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(300px,1fr)); gap: 1rem; }
+.crit-card {
+  background: var(--bg-card); border-radius: var(--radius);
+  border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden;
+}
+.crit-card-header { display: flex; align-items: center; justify-content: space-between; padding: .8rem 1rem; }
+.crit-card.pass .crit-card-header { background: var(--pass-bg); border-bottom: 1px solid var(--pass-border); }
+.crit-card.fail .crit-card-header { background: var(--fail-bg); border-bottom: 1px solid var(--fail-border); }
+.crit-card.na   .crit-card-header { background: var(--na-bg);   border-bottom: 1px solid var(--na-border); }
+.crit-name { font-weight: 700; font-size: .88rem; }
+.crit-card.pass .crit-name { color: var(--pass-text); }
+.crit-card.fail .crit-name { color: var(--fail-text); }
+.crit-card.na   .crit-name { color: var(--na-text); }
+.crit-status { font-size: .72rem; font-weight: 700; padding: 3px 10px; border-radius: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.pass .crit-status { background: var(--pass-border); color: #fff; }
+.fail .crit-status { background: var(--fail-border); color: #fff; }
+.na   .crit-status { background: var(--na-border);   color: #fff; }
+.crit-body { padding: .9rem 1rem; font-size: .83rem; color: var(--text-muted); line-height: 1.55; }
+.crit-body .row { display: flex; justify-content: space-between; border-bottom: 1px dashed #eee; padding: 3px 0; }
+.crit-body .row span:last-child { font-weight: 600; color: var(--text); }
+.score-pts { font-size: .82rem; font-weight: 700; padding: .5rem 1rem; text-align: right; border-top: 1px solid var(--border); background: #f9fafc; }
+.annex-section { margin-top: .6rem; }
+.annex-header {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; background: #f0f4fc; border: 1px solid var(--border);
+  border-radius: 8px 8px 0 0; padding: .6rem 1rem;
+  font-size: .85rem; font-weight: 700; color: var(--bg-header); user-select: none;
+}
+.annex-header .toggle-icon { font-size: 1rem; transition: transform .2s; }
+.annex-header.open .toggle-icon { transform: rotate(180deg); }
+.annex-body { display: none; border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px; overflow-x: auto; background: #fff; }
+.annex-body.open { display: block; }
+.annex-body table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.annex-body th { background: #e8effd; color: var(--bg-header); padding: 6px 10px; text-align: left; font-weight: 700; border-bottom: 1px solid var(--border); }
+.annex-body td { padding: 5px 10px; border-bottom: 1px dashed #eee; color: var(--text); }
+.annex-body tr:last-child td { border-bottom: none; }
+.annex-body tr:hover td { background: #f5f8ff; }
+.annex-body .ev { color: var(--danger); font-weight: 600; }
+.index-nav {
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1rem 1.2rem; margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: .5rem;
+}
+.index-nav a { font-size: .78rem; padding: 3px 10px; border-radius: 12px; background: #e8effd; color: var(--accent); text-decoration: none; font-weight: 600; }
+.index-nav a:hover { background: var(--accent); color: #fff; }
+#btn-new {
+  display: inline-block; margin: 2rem 0 0; padding: .6rem 1.5rem;
+  background: transparent; border: 2px solid var(--accent); color: var(--accent);
+  border-radius: 8px; font-size: .9rem; font-weight: 700; cursor: pointer;
+}
+#btn-new:hover { background: var(--accent); color: #fff; }
+#btn-export {
+  padding: .5rem 1.2rem; border-radius: 8px; border: none;
+  background: var(--accent); color: #fff; cursor: pointer; font-size: .85rem; font-weight: 600;
+}
+#btn-export:hover { background: var(--accent-hover); }
+
+/* ══ SMART SUGGESTIONS ══ */
+.sug-section { margin-bottom: 1rem; }
+.sug-header {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; background: #f0f4fc; border: 1px solid var(--border);
+  border-radius: 8px 8px 0 0; padding: .6rem 1rem;
+  font-size: .85rem; font-weight: 700; color: var(--bg-header); user-select: none;
+}
+.sug-header .toggle-icon { font-size: 1rem; transition: transform .2s; }
+.sug-header.open .toggle-icon { transform: rotate(180deg); }
+.sug-body {
+  display: none; border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 8px 8px; overflow: hidden; background: #fff;
+}
+.sug-body.open { display: block; }
+.sug-table { width: 100%; border-collapse: collapse; font-size: .79rem; }
+.sug-table th {
+  background: #1e3a6e; color: #fff;
+  padding: 6px 10px; text-align: left; font-weight: 700;
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+}
+.sug-table td { padding: 6px 10px; border-bottom: 1px dashed #eee; color: var(--text); vertical-align: top; }
+.sug-table tr:last-child td { border-bottom: none; }
+.sug-table tr:hover td { background: #f5f8ff; }
+.sug-act-id  { font-weight: 800; color: var(--bg-header); font-family: monospace; font-size: .82rem; }
+.sug-cmd     { font-family: monospace; font-size: .8rem; font-weight: 700; color: var(--accent); background: #eff4ff; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+.sug-reason  { color: var(--text-muted); font-size: .76rem; margin-top: 2px; }
+.sug-conf    { font-size: .7rem; font-weight: 700; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+.conf-high   { background: #ecfdf5; color: #065f46; }
+.conf-mid    { background: #fffbeb; color: #92400e; }
+.conf-low    { background: #fef2f2; color: #7f1d1d; }
+/* pattern clusters */
+.pattern-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: .75rem; padding: 1rem; }
+.pattern-card {
+  border-radius: 8px; border: 1px solid var(--border);
+  overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.05);
+}
+.pattern-card-head {
+  background: #0f2140; color: #fff;
+  padding: .55rem .85rem; font-size: .78rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.pattern-card-head .pc-count { font-size: .7rem; opacity: .65; font-weight: 400; }
+.pattern-card-body { padding: .65rem .85rem; font-size: .78rem; }
+.pattern-card-body p { color: var(--text-muted); margin-bottom: .5rem; line-height: 1.5; }
+.pattern-ids { display: flex; flex-wrap: wrap; gap: .3rem; }
+.pattern-id  { font-family: monospace; font-size: .74rem; font-weight: 700; background: #eff4ff; color: var(--accent); padding: 1px 6px; border-radius: 4px; }
+.pattern-action { font-size: .76rem; font-weight: 700; color: var(--accent); margin-top: .5rem; padding-top: .5rem; border-top: 1px dashed #eee; }
+
+@media(max-width:760px){
+  .home-grid { grid-template-columns: 1fr; }
+  .report-header { padding: 1.5rem; }
+  .score-section { padding: 1.5rem; flex-direction: column; gap: 1.5rem; }
+  .report-body  { padding: 1rem 1rem 3rem; }
+  .compare-bar  { padding: .5rem 1rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ TOPNAV (always visible) ══ -->
+<nav class="topnav">
+  <div class="nav-left">
+    <div class="nav-avatar">KG</div>
+    <div>
+      <div class="nav-name">Kauê Gutierres</div>
+      <div class="nav-sub">Consultoria &amp; Gestão de Projetos de Infraestrutura</div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <span class="nav-pill" id="nav-home-btn" onclick="goHome()">Gerenciador de Projetos</span>
+    <span class="nav-pill primary" id="nav-report-btn" style="display:none" onclick="backToHome()">↩ Voltar</span>
+  </div>
+</nav>
+
+<!-- ══ HOME SCREEN ══ -->
+<div id="home-screen">
+
+  <!-- hero -->
+  <div class="home-hero">
+    <div class="hero-badge">KG Consultoria · <span>Planejamento</span></div>
+    <h1>Auditor DCMA 14 Pontos</h1>
+    <p>Gerencie projetos, suba revisões e compare histórico de conformidade do cronograma</p>
+  </div>
+
+  <div class="home-body">
+    <div class="home-grid">
+
+      <!-- project list -->
+      <div class="glass-panel">
+        <div class="panel-head">
+          <div class="panel-head-title">📁 Projetos</div>
+          <button onclick="newProject()">+ Novo Projeto</button>
+        </div>
+        <ul class="proj-list" id="proj-list">
+          <li class="proj-empty" id="proj-empty">Nenhum projeto ainda.<br>Crie um usando o painel ao lado.</li>
+        </ul>
+      </div>
+
+      <!-- upload panel -->
+      <div class="glass-panel">
+        <div class="panel-head">
+          <div class="panel-head-title">📤 Subir Revisão</div>
+        </div>
+        <div class="up-body">
+          <div class="up-field-label">Projeto de Destino</div>
+          <input type="text" class="up-input" id="new-proj-name" placeholder="Nome do Projeto…">
+          <div class="up-field-label">Rótulo da Revisão</div>
+          <input type="text" class="up-input" id="rev-label" placeholder="Ex: Rev.01 – Linha de Base">
+          <div class="up-field-label">Arquivo do Cronograma</div>
+          <div class="drop-zone" id="drop-zone" onclick="document.getElementById('fi').click()">
+            <div class="drop-icon">📂</div>
+            <div class="drop-label">Soltar ou clicar para selecionar</div>
+            <div class="drop-hint" id="fn">Nenhum arquivo selecionado</div>
+            <input type="file" id="fi" accept=".xlsx,.xls,.csv,.xml">
+          </div>
+          <div class="fmt-pills">
+            <span class="fmt-pill">XLSX / XLS</span>
+            <span class="fmt-pill">CSV</span>
+            <span class="fmt-pill">MS Project XML</span>
+          </div>
+          <div class="up-err" id="up-err"></div>
+          <div class="up-msg" id="up-msg"></div>
+          <button class="up-btn" id="up-btn" onclick="runAnalysis()">▶ Analisar e Salvar Revisão</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- history panel -->
+    <div class="hist-wrap glass-panel" id="hist-panel" style="display:none">
+      <div class="panel-head" style="background:#0f2140">
+        <div class="panel-head-title" style="color:#fff" id="hist-title">Histórico de Revisões</div>
+        <span style="font-size:.72rem;color:rgba(255,255,255,.45)" id="hist-proj-label"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="hist-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Rótulo</th><th>Arquivo</th>
+              <th>Analisado em</th><th>Data de Status</th><th>Atividades</th>
+              <th>SV Score</th><th>Δ Score</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="hist-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ REPORT SCREEN ══ -->
+<div id="report-screen">
+
+  <div class="report-header">
+    <h1 id="rpt-project">Relatório de Cronograma</h1>
+    <div class="dates-row">
+      <div class="date-item"><span>Data de Status</span><b id="rpt-data-date">–</b></div>
+      <div class="date-item"><span>Início do Projeto</span><b id="rpt-start">–</b></div>
+      <div class="date-item"><span>Término do Projeto</span><b id="rpt-finish">–</b></div>
+      <div class="date-item"><span>Revisão</span><b id="rpt-rev">–</b></div>
+      <div class="date-item"><span>Análise realizada</span><b id="rpt-date">–</b></div>
+    </div>
+  </div>
+
+  <div class="compare-bar" id="compare-bar" style="display:none">
+    <span class="cb-item">📊 Comparando com: <b id="cmp-rev-name">—</b></span>
+    <span class="cb-item">Score anterior: <b id="cmp-prev-score">—</b></span>
+    <span class="cb-item">Score atual: <b id="cmp-curr-score">—</b></span>
+    <span class="cb-item"><b id="cmp-diff">—</b></span>
+  </div>
+
+  <div class="score-section">
+    <div class="score-circle" id="score-circle">
+      <div class="num" id="score-num">0</div>
+      <div class="lbl">SV Score</div>
+    </div>
+    <div class="score-desc">
+      <h2>Score de Validação do Cronograma</h2>
+      <p id="score-text">–</p>
+      <div class="score-meta">
+        <div class="sm">Padrão: <b>2026 Scoring Standard</b></div>
+        <div class="sm">Cobertura: <b id="score-cov">–</b></div>
+        <div class="sm">Atividades auditáveis: <b id="score-act">–</b></div>
+      </div>
+      <div id="risk-badge-wrap"></div>
+    </div>
+  </div>
+
+  <div class="report-body">
+    <button id="btn-new" onclick="backToHome()">↩ Voltar aos Projetos</button>
+
+    <div class="section-title" style="margin-top:1.5rem">Resumo Executivo</div>
+    <div class="exec-card">
+      <h3>Top causas que mais impactaram o Score</h3>
+      <ul class="top-causes" id="top-causes"></ul>
+    </div>
+    <div class="exec-card">
+      <h3>Plano de Ação por Prioridade</h3>
+      <div class="action-grid" id="action-grid"></div>
+    </div>
+
+    <div class="toolbar" style="margin-top:2rem">
+      <input type="text" id="search-input" placeholder="🔍 Pesquisar atividade nas tabelas…" oninput="filterTables(this.value)">
+      <button id="btn-all"  class="active" onclick="filterCards('all',this)">Todos</button>
+      <button id="btn-fail" onclick="filterCards('fail',this)">Reprovados</button>
+      <button id="btn-pass" onclick="filterCards('pass',this)">Aprovados</button>
+      <button id="btn-na"   onclick="filterCards('na',this)">N/A</button>
+      <button id="btn-export" onclick="exportReport()">⬇ Exportar HTML</button>
+    </div>
+
+    <div class="index-nav" id="index-nav"></div>
+
+    <div class="section-title">Critérios Pontuados</div>
+    <div class="criteria-grid" id="criteria-grid"></div>
+
+    <div class="section-title" style="margin-top:2.5rem">💡 Sugestões de Correção por Atividade</div>
+    <div id="suggestions-container"></div>
+
+    <div class="section-title" style="margin-top:2rem">🔗 Padrões de Problema Identificados</div>
+    <div id="patterns-container"></div>
+
+    <div class="section-title" style="margin-top:2.5rem">Anexos por Critério</div>
+    <div id="annexes"></div>
+  </div>
+</div>
+
+<button id="btn-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+<script>
+// ══════════════════════════════════════════
+//  STORAGE
+// ══════════════════════════════════════════
+const STORE_KEY = 'dcma_v4_projects';
+function loadProjects() { try { return JSON.parse(localStorage.getItem(STORE_KEY))||{}; } catch(e){return{};} }
+function saveProjects(d) { localStorage.setItem(STORE_KEY,JSON.stringify(d)); }
+
+// ══════════════════════════════════════════
+//  GLOBALS
+// ══════════════════════════════════════════
+let G={}, REPORT={}, CURRENT_PROJ=null;
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded',()=>{
+  renderProjList();
+  initDropzone();
+  document.getElementById('new-proj-name').addEventListener('input', e=>{
+    CURRENT_PROJ = e.target.value.trim()||null;
+  });
+});
+
+function goHome(){
+  document.getElementById('home-screen').style.display='block';
+  document.getElementById('report-screen').style.display='none';
+  document.getElementById('nav-home-btn').style.display='';
+  document.getElementById('nav-report-btn').style.display='none';
+  renderProjList();
+  if(CURRENT_PROJ) renderHistory(CURRENT_PROJ);
+}
+
+// ══════════════════════════════════════════
+//  PROJECT LIST
+// ══════════════════════════════════════════
+function renderProjList(){
+  const data=loadProjects();
+  const list=document.getElementById('proj-list');
+  const keys=Object.keys(data).sort();
+  if(!keys.length){
+    list.innerHTML='<li class="proj-empty">Nenhum projeto ainda.<br>Crie um usando o painel ao lado.</li>';
+    return;
+  }
+  list.innerHTML='';
+  keys.forEach(name=>{
+    const revs=data[name]||[];
+    const last=revs[revs.length-1];
+    const sc=last?last.score:null;
+    const riskCls=sc===null?'score-na':sc>=70?'score-low':sc>=50?'score-mid':'score-high';
+    const li=document.createElement('li');
+    li.className='proj-item'+(name===CURRENT_PROJ?' selected':'');
+    li.innerHTML=`
+      <div class="proj-item-left">
+        <div class="proj-name">${name}</div>
+        <div class="proj-meta">${revs.length} revisão(ões) · Última: ${last?last.date:'—'}</div>
+      </div>
+      <div style="display:flex;align-items:center;flex-shrink:0">
+        <span class="proj-score-badge ${riskCls}">${sc!==null?sc:'—'}</span>
+        <button class="proj-del" onclick="deleteProject(event,'${name}')">✕</button>
+      </div>`;
+    li.onclick=e=>{ if(e.target.classList.contains('proj-del'))return; selectProject(name); };
+    list.appendChild(li);
+  });
+}
+
+function selectProject(name){
+  CURRENT_PROJ=name;
+  document.getElementById('new-proj-name').value=name;
+  const data=loadProjects();
+  const revs=data[name]||[];
+  document.getElementById('rev-label').value='Rev.'+String(revs.length+1).padStart(2,'0');
+  renderProjList();
+  renderHistory(name);
+}
+
+function newProject(){
+  const name=prompt('Nome do novo projeto:');
+  if(!name||!name.trim())return;
+  const data=loadProjects();
+  if(!data[name.trim()]){ data[name.trim()]=[]; saveProjects(data); }
+  selectProject(name.trim());
+  renderProjList();
+}
+
+function deleteProject(e,name){
+  e.stopPropagation();
+  if(!confirm(`Excluir projeto "${name}" e todo o histórico?`))return;
+  const data=loadProjects();
+  delete data[name];
+  saveProjects(data);
+  if(CURRENT_PROJ===name){ CURRENT_PROJ=null; document.getElementById('hist-panel').style.display='none'; }
+  renderProjList();
+}
+
+// ══════════════════════════════════════════
+//  HISTORY
+// ══════════════════════════════════════════
+function renderHistory(projName){
+  const data=loadProjects();
+  const revs=data[projName]||[];
+  const panel=document.getElementById('hist-panel');
+  document.getElementById('hist-proj-label').textContent=projName;
+  panel.style.display=revs.length?'block':'none';
+  const tbody=document.getElementById('hist-tbody');
+  tbody.innerHTML='';
+  revs.forEach((rev,i)=>{
+    const prev=i>0?revs[i-1]:null;
+    const diff=prev!==null?rev.score-prev.score:null;
+    const diffHtml=diff===null?'<span class="diff-eq">—</span>'
+      :diff>0?`<span class="diff-up">▲ +${diff}</span>`
+      :diff<0?`<span class="diff-down">▼ ${diff}</span>`
+      :'<span class="diff-eq">= 0</span>';
+    const sc=rev.score;
+    const rCls=sc>=70?'score-low':sc>=50?'score-mid':'score-high';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${i+1}</td>
+      <td><b>${rev.label||('Rev.'+String(i+1).padStart(2,'0'))}</b></td>
+      <td style="font-size:.74rem;color:var(--text-muted)">${rev.fileName}</td>
+      <td>${rev.date}</td>
+      <td>${rev.statusDate||'—'}</td>
+      <td>${rev.actCount}</td>
+      <td><span class="proj-score-badge ${rCls}">${sc}</span></td>
+      <td>${diffHtml}</td>
+      <td>
+        <button class="hist-open" onclick="openRevision('${projName}',${i})">Abrir</button>
+        <button class="hist-del"  onclick="deleteRevision('${projName}',${i})">✕</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function deleteRevision(projName,idx){
+  if(!confirm('Excluir esta revisão?'))return;
+  const data=loadProjects();
+  data[projName].splice(idx,1);
+  saveProjects(data);
+  renderHistory(projName);
+  renderProjList();
+}
+
+function openRevision(projName,idx){
+  const data=loadProjects();
+  const rev=data[projName][idx];
+  if(!rev)return;
+  CURRENT_PROJ=projName;
+  G=rev.G||{};
+  REPORT=rev.REPORT||{};
+  if(G.startDate)  G.startDate=new Date(G.startDate);
+  if(G.finishDate) G.finishDate=new Date(G.finishDate);
+  if(G.statusDate) G.statusDate=new Date(G.statusDate);
+  // Restore activity dates and successors map
+  if(G.activities){
+    const amap={};
+    G.activities.forEach(a=>{
+      if(a.start)  a.start=new Date(a.start);
+      if(a.finish) a.finish=new Date(a.finish);
+      amap[a.id]=a; a.successors=a.successors||[];
+    });
+  }
+  const prevRev=idx>0?data[projName][idx-1]:null;
+  renderReport(rev.label,rev.date,prevRev);
+  document.getElementById('home-screen').style.display='none';
+  document.getElementById('report-screen').style.display='block';
+  document.getElementById('nav-home-btn').style.display='none';
+  document.getElementById('nav-report-btn').style.display='';
+  window.scrollTo(0,0);
+}
+
+// ══════════════════════════════════════════
+//  FILE INPUT
+// ══════════════════════════════════════════
+function initDropzone(){
+  document.getElementById('fi').addEventListener('change',e=>{
+    const f=e.target.files[0]; if(!f)return;
+    document.getElementById('fn').textContent=f.name;
+    document.getElementById('up-btn').style.display='block';
+    document.getElementById('up-err').textContent='';
+    G.file=f; G.fileName=f.name;
+  });
+  const dz=document.getElementById('drop-zone');
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.style.background='#dbeafe';});
+  dz.addEventListener('dragleave',()=>dz.style.background='');
+  dz.addEventListener('drop',e=>{
+    e.preventDefault();dz.style.background='';
+    const f=e.dataTransfer.files[0];
+    if(f){G.file=f;G.fileName=f.name;document.getElementById('fn').textContent=f.name;document.getElementById('up-btn').style.display='block';}
+  });
+}
+
+function showErr(m){document.getElementById('up-err').textContent=m;document.getElementById('up-msg').textContent='';}
+function setMsg(m) {document.getElementById('up-msg').textContent=m;}
+function sleep(ms) {return new Promise(r=>setTimeout(r,ms));}
+
+// ══════════════════════════════════════════
+//  MAIN ENTRY
+// ══════════════════════════════════════════
+async function runAnalysis(){
+  const projName=document.getElementById('new-proj-name').value.trim();
+  if(!projName)return showErr('Informe o nome do projeto.');
+  if(!G.file)  return showErr('Selecione um arquivo.');
+  document.getElementById('up-btn').style.display='none';
+  setMsg('Lendo arquivo…'); await sleep(30);
+  const ext=G.fileName.split('.').pop().toLowerCase();
+  try{
+    if(ext==='xml') await parseXML(G.file);
+    else            await parseXLSX(G.file);
+    setMsg('Calculando critérios DCMA…'); await sleep(30);
+    computeReport();
+    setMsg('Salvando revisão…'); await sleep(30);
+    const data=loadProjects();
+    if(!data[projName]) data[projName]=[];
+    const revLabel=document.getElementById('rev-label').value.trim()||'Rev.'+String(data[projName].length+1).padStart(2,'0');
+    const revIdx=data[projName].length;
+    const today=new Date().toLocaleDateString('pt-BR');
+    data[projName].push({
+      label:revLabel, fileName:G.fileName, date:today,
+      statusDate:fmtDate(G.statusDate), actCount:REPORT.total, score:REPORT.score,
+      G:serializeG(G), REPORT:serializeReport(REPORT)
+    });
+    saveProjects(data);
+    CURRENT_PROJ=projName;
+    const prevRev=revIdx>0?data[projName][revIdx-1]:null;
+    renderReport(revLabel,today,prevRev);
+    document.getElementById('home-screen').style.display='none';
+    document.getElementById('report-screen').style.display='block';
+    document.getElementById('nav-home-btn').style.display='none';
+    document.getElementById('nav-report-btn').style.display='';
+    setMsg(''); window.scrollTo(0,0);
+  } catch(err){
+    showErr('Erro: '+err.message); console.error(err);
+    document.getElementById('up-btn').style.display='block';
+  }
+}
+
+function serializeG(g){
+  // Serialize activities for smart suggestions on re-open (strip File refs)
+  const acts = (g.activities||[]).map(a=>({
+    id:a.id, name:a.name, durD:a.durD, remD:a.remD,
+    tf:a.tf, pct:a.pct,
+    start:a.start?a.start.toISOString():null,
+    finish:a.finish?a.finish.toISOString():null,
+    status:a.status, isMilestone:a.isMilestone, isSummary:a.isSummary,
+    constraint:a.constraint,
+    predecessors:a.predecessors||[],
+    successors:a.successors||[]
+  }));
+  return{projectName:g.projectName,fileName:g.fileName,
+    startDate:g.startDate?g.startDate.toISOString():null,
+    finishDate:g.finishDate?g.finishDate.toISOString():null,
+    statusDate:g.statusDate?g.statusDate.toISOString():null,
+    activities:acts};
+}
+function serializeReport(r){
+  return JSON.parse(JSON.stringify({criteria:r.criteria,score:r.score,coverage:r.coverage,total:r.total,projDurDays:r.projDurDays,hasTF:r.hasTF}));
+}
+
+function backToHome(){
+  G={}; REPORT={};
+  document.getElementById('fn').textContent='Nenhum arquivo selecionado';
+  document.getElementById('up-btn').style.display='none';
+  document.getElementById('up-err').textContent='';
+  document.getElementById('up-msg').textContent='';
+  document.getElementById('report-screen').style.display='none';
+  document.getElementById('home-screen').style.display='block';
+  document.getElementById('nav-home-btn').style.display='';
+  document.getElementById('nav-report-btn').style.display='none';
+  renderProjList();
+  if(CURRENT_PROJ) renderHistory(CURRENT_PROJ);
+}
+
+// ══════════════════════════════════════════
+//  PARSE
+// ══════════════════════════════════════════
+async function parseXLSX(file){
+  const data=await file.arrayBuffer();
+  const wb=XLSX.read(data,{type:'array',cellDates:true});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+  if(!rows.length)throw new Error('Planilha vazia ou sem cabeçalho.');
+  processRows(rows);
+}
+async function parseXML(file){
+  const text=await file.text();
+  const doc=new DOMParser().parseFromString(text,'text/xml');
+  const tasks=doc.querySelectorAll('Task');
+  if(tasks.length>0){parseMSPXML(doc,tasks);return;}
+  throw new Error('Formato XML não reconhecido. Use MS Project XML ou XLSX/CSV.');
+}
+function parseMSPXML(doc,tasks){
+  const p=doc.querySelector('Project');
+  G.projectName=getXT(p,'Name')||getXT(p,'Title')||'Projeto';
+  G.startDate=pd(getXT(p,'StartDate')||getXT(p,'Start'));
+  G.finishDate=pd(getXT(p,'FinishDate')||getXT(p,'Finish'));
+  G.statusDate=pd(getXT(p,'StatusDate')||getXT(p,'CurrentDate'));
+  G.activities=[];
+  tasks.forEach(t=>{
+    const uid=getXT(t,'UID');if(uid==='0')return;
+    const durD=parseDurXML(getXT(t,'Duration'));
+    const pct=parseFloat(getXT(t,'PercentComplete')||'0');
+    const tf=parseFloat(getXT(t,'TotalSlack')||getXT(t,'FreeSlack')||'');
+    const predecessors=Array.from(t.querySelectorAll('PredecessorLink')).map(pl=>({uid:getXT(pl,'PredecessorUID'),type:getXT(pl,'Type'),lag:parseFloat(getXT(pl,'LinkLag')||'0')/4800}));
+    let status=pct>=100?'Concluída':pct>0?'Em Andamento':'Não Iniciada';
+    G.activities.push({id:uid,name:getXT(t,'Name'),durD,remD:durD,start:pd(getXT(t,'Start')),finish:pd(getXT(t,'Finish')),pct,tf:isNaN(tf)?null:tf/4800,isMilestone:getXT(t,'Milestone')==='1',isSummary:getXT(t,'Summary')==='1',constraint:getXT(t,'ConstraintType'),status,predecessors});
+  });
+  buildSuccessors();
+}
+function parseDurXML(d){if(!d)return 0;const m=d.match(/PT(\d+(\.\d+)?)M/);return m?parseFloat(m[1])/480:0;}
+function processRows(rows){
+  const colMap={};
+  const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s_\-]/g,'');
+  Object.keys(rows[0]).forEach(h=>{colMap[norm(h)]=h;});
+  const get=(row,...cs)=>{for(const c of cs){const k=colMap[norm(c)];if(k!==undefined&&row[k]!==undefined&&row[k]!=='')return row[k];}return undefined;};
+  G.projectName=G.fileName.replace(/\.[^.]+$/,'');
+  G.activities=[];
+  const allDates=[];
+  rows.forEach((row,i)=>{
+    const name=get(row,'Activity Name','Nome','Name','Task Name','Tarefa','Atividade')||('AT-'+(i+1));
+    const id=get(row,'Activity ID','ID','Task ID','Código','Code')||String(i+1);
+    const durRaw=get(row,'Original Duration','Duração Original','Duration','Duração','At Completion Duration');
+    const remDur=get(row,'Remaining Duration','Duração Remanescente','Rem Dur');
+    const tfRaw=get(row,'Total Float','Folga Total','TF','Float');
+    const startRaw=get(row,'Start','Início','Early Start','Início Mais Cedo','Planned Start','BL Start');
+    const finRaw=get(row,'Finish','Término','Early Finish','Término Mais Cedo','Planned Finish','BL Finish');
+    const pctRaw=get(row,'% Complete','% Completo','Percent Complete','Physical % Complete');
+    const statusRaw=get(row,'Status','Status da Atividade','Activity Status');
+    const isMile=get(row,'Milestone','Marco')==='Yes'||durRaw==0;
+    const isSumm=get(row,'WBS Summary','Resumo','Summary')==='Yes';
+    const constraint=get(row,'Constraint','Restrição','Constraint Type','Tipo de Restrição');
+    const predRaw=get(row,'Predecessor','Predecessoras','Predecessors','Predecessor Activity ID');
+    const durD=parseFloat(String(durRaw).replace(/[^0-9.]/g,''))||0;
+    const remD=parseFloat(String(remDur).replace(/[^0-9.]/g,''))||durD;
+    const tf=tfRaw!==undefined?parseFloat(String(tfRaw).replace(/[^0-9.\-]/g,'')):null;
+    const pct=parseFloat(String(pctRaw).replace(/[^0-9.]/g,''))||0;
+    const start=pd(startRaw),finish=pd(finRaw);
+    if(start)allDates.push(start);if(finish)allDates.push(finish);
+    let status=statusRaw||(pct>=100?'Concluída':pct>0?'Em Andamento':'Não Iniciada');
+    G.activities.push({id,name,durD,remD,tf:isNaN(tf)?null:tf,pct,start,finish,status,isMilestone:isMile,isSummary:isSumm,constraint,predecessors:parsePredStr(predRaw)});
+  });
+  if(!G.startDate&&allDates.length)G.startDate=new Date(Math.min(...allDates.map(d=>d.getTime())));
+  if(!G.finishDate&&allDates.length)G.finishDate=new Date(Math.max(...allDates.map(d=>d.getTime())));
+  buildSuccessors();
+}
+function parsePredStr(raw){
+  if(!raw)return[];
+  return String(raw).split(/[,;]/).map(s=>{s=s.trim();if(!s)return null;const m=s.match(/^([A-Za-z0-9\-_]+)(FS|SS|FF|SF)?([+-]?\d+)?/i);return m?{uid:m[1],type:(m[2]||'FS').toUpperCase(),lag:parseInt(m[3]||0)}:null;}).filter(Boolean);
+}
+function buildSuccessors(){
+  const map={};
+  G.activities.forEach(a=>{map[a.id]=a;a.successors=[];});
+  G.activities.forEach(a=>{a.predecessors.forEach(p=>{const pred=map[p.uid];if(pred)pred.successors.push({uid:a.id,type:p.type,lag:p.lag});});});
+}
+function getXT(el,tag){if(!el)return'';const f=el.querySelector(tag);return f?f.textContent.trim():'';}
+function pd(raw){
+  if(!raw)return null;if(raw instanceof Date)return isNaN(raw.getTime())?null:raw;
+  if(typeof raw==='number'){const d=new Date((raw-25569)*86400000);return isNaN(d.getTime())?null:d;}
+  const s=String(raw).trim();if(!s||s.toLowerCase()==='na')return null;
+  const d=new Date(s);return isNaN(d.getTime())?null:d;
+}
+function fmtDate(d){if(!d)return'–';if(!(d instanceof Date))return d;return d.toLocaleDateString('pt-BR');}
+function pct100(n,d){return d>0?Math.round((n/d)*1000)/10:0;}
+function round2(v){return Math.round(v*100)/100;}
+
+// ══════════════════════════════════════════
+//  COMPUTE
+// ══════════════════════════════════════════
+function computeReport(){
+  const acts=G.activities.filter(a=>!a.isSummary);
+  const total=acts.length;
+  const projDurDays=(G.startDate&&G.finishDate)?Math.round((G.finishDate-G.startDate)/86400000):0;
+  const durLimit=projDurDays>0?projDurDays*0.1:null;
+  const criteria=[];
+  const hasTF=acts.some(a=>a.tf!==null&&!isNaN(a.tf));
+  const hasStartFinish=acts.some(a=>a.start||a.finish);
+  const push=obj=>criteria.push(obj);
+
+  {const v=acts.filter(a=>!a.isMilestone&&a.predecessors.length===0);const p=pct100(v.length,total);const ok=p<=5;push({id:'mp',name:'Lógica ausente de predecessor (Open Start)',group:'Lógica / Open Ends',found:v.length,foundPct:p,limit:'≤ 5%',pass:ok,impact:'Atividades sem predecessor podem flutuar livremente, distorcendo o caminho crítico.',fix:'Adicione ao menos um vínculo predecessor FS para cada atividade que não seja o marco de início.',pts:ok?8:Math.max(0,8-Math.round(p/5)*2),maxPts:8,rows:v.map(a=>({id:a.id,name:a.name,status:a.status,ev:'Sem predecessor'}))});}
+  {const v=acts.filter(a=>!a.isMilestone&&(!a.successors||a.successors.length===0));const p=pct100(v.length,total);const ok=p<=5;push({id:'ms',name:'Lógica ausente de sucessor (Open Finish)',group:'Lógica / Open Ends',found:v.length,foundPct:p,limit:'≤ 5%',pass:ok,impact:'Atividades sem sucessor encerram a lógica de rede prematuramente.',fix:'Conecte cada atividade a pelo menos um sucessor para garantir continuidade da rede.',pts:ok?8:Math.max(0,8-Math.round(p/5)*2),maxPts:8,rows:v.map(a=>({id:a.id,name:a.name,status:a.status,ev:'Sem sucessor'}))});}
+  {const v=acts.filter(a=>a.predecessors.some(p=>p.lag<0));const p=pct100(v.length,total);const ok=p===0;push({id:'lagneg',name:'Lag negativo (Lead)',group:'Relacionamentos / Lag',found:v.length,foundPct:p,limit:'0%',pass:ok,impact:'Leads comprimem artificialmente o cronograma e tornam o caminho crítico não confiável.',fix:'Substitua lags negativos pela lógica correta (ex: SS com lag positivo ou divisão em atividades).',pts:ok?6:0,maxPts:6,rows:v.map(a=>{const pl=a.predecessors.find(p=>p.lag<0);return{id:a.id,name:a.name,status:a.status,ev:`Lag = ${pl.lag}d com pred. ${pl.uid}`};})});}
+  {const v=acts.filter(a=>a.predecessors.some(p=>p.lag>0&&(p.type==='FS'||!p.type)));const p=pct100(v.length,total);const ok=p<=5;push({id:'lagpos',name:'FS com lag positivo',group:'Relacionamentos / Lag',found:v.length,foundPct:p,limit:'≤ 5%',pass:ok,impact:'Lags positivos em FS podem esconder atividades omitidas no cronograma.',fix:'Avalie se o lag representa trabalho real; se sim, crie uma atividade separada.',pts:ok?5:Math.max(0,5-Math.round(p/5)),maxPts:5,rows:v.map(a=>{const pl=a.predecessors.find(p=>p.lag>0&&(p.type==='FS'||!p.type));return{id:a.id,name:a.name,status:a.status,ev:`Lag FS = +${pl.lag}d (pred. ${pl.uid})`};})});}
+  {const v=acts.filter(a=>a.predecessors.some(p=>['SS','FF','SF'].includes(p.type)));const p=pct100(v.length,total);const ok=p<=25;push({id:'ssff',name:'% de SS, FF e SF',group:'Relacionamentos / Lag',found:v.length,foundPct:p,limit:'≤ 25%',pass:ok,impact:'Excesso de vínculos SS/FF/SF pode indicar lógica frágil e dificulta análise CPM.',fix:'Revise se os vínculos SS/FF têm justificativa técnica. Prefira FS quando possível.',pts:ok?5:Math.max(0,5-Math.round((p-25)/5)),maxPts:5,rows:v.map(a=>{const pl=a.predecessors.find(p=>['SS','FF','SF'].includes(p.type));return{id:a.id,name:a.name,status:a.status,ev:`Vínculo ${pl.type} com pred. ${pl.uid}`};})});}
+  {const hard=['2','3','4','5','7','8','MFO','MSO','FNLT','FNET','SNLT','SNET'];const v=acts.filter(a=>{if(!a.constraint)return false;const c=String(a.constraint);return hard.some(h=>c.includes(h)||c.toUpperCase().includes(h));});const p=pct100(v.length,total);const ok=p<=5;push({id:'hc',name:'Restrições duras (Hard Constraints)',group:'Restrições e Folgas',found:v.length,foundPct:p,limit:'≤ 5%',pass:ok,impact:'Restrições duras sobrescrevem a lógica de rede e impedem ajustes automáticos pelo software.',fix:'Substitua por restrições suaves (SNET, FNLT) ou remova e use a lógica de rede.',pts:ok?6:Math.max(0,6-Math.round(p/5)*2),maxPts:6,rows:v.map(a=>({id:a.id,name:a.name,status:a.status,ev:`Restrição: ${a.constraint}`}))});}
+  {const soft=['6','1','SNET','FNLT'];const v=acts.filter(a=>{if(!a.constraint)return false;const c=String(a.constraint);return soft.some(h=>c.includes(h)||c.toUpperCase().includes(h));});const p=pct100(v.length,total);const ok=p<=15;push({id:'sc',name:'Restrições suaves (Soft Constraints)',group:'Restrições e Folgas',found:v.length,foundPct:p,limit:'≤ 15%',pass:ok,impact:'Muitas restrições suaves ainda reduzem a flexibilidade do cronograma.',fix:'Avalie a necessidade de cada restrição suave; prefira lógica de rede quando possível.',pts:ok?4:Math.max(0,4-Math.round(p/10)),maxPts:4,rows:v.map(a=>({id:a.id,name:a.name,status:a.status,ev:`Restrição: ${a.constraint}`}))});}
+  if(hasTF){const v=acts.filter(a=>a.tf!==null&&a.tf<0);const p=pct100(v.length,total);const ok=p===0;push({id:'nf',name:'Folga negativa (Negative Float)',group:'Restrições e Folgas',found:v.length,foundPct:p,limit:'0%',pass:ok,impact:'Folga negativa indica que o projeto está atrasado ou possui restrições conflitantes.',fix:'Identifique restrições duras ou lags que causam folga negativa e corrija a lógica ou datas.',pts:ok?8:Math.max(0,8-v.length),maxPts:8,rows:v.map(a=>({id:a.id,name:a.name,status:a.status,ev:`Folga Total = ${round2(a.tf)}d`}))});}
+  else push({id:'nf',name:'Folga negativa (Negative Float)',group:'Restrições e Folgas',found:0,foundPct:0,limit:'0%',pass:null,impact:'Coluna Folga Total não encontrada.',fix:'Exporte o campo "Total Float" (Folga Total) do P6 ou MS Project.',pts:0,maxPts:8,rows:[],isNA:true});
+  if(hasTF){const elig=acts.filter(a=>{const r=a.remD||a.durD;return a.tf!==null&&!isNaN(a.tf)&&r>0;});const v=elig.filter(a=>a.tf>(a.remD||a.durD)*0.5);const p=pct100(v.length,total);const ok=p<=5;push({id:'tf50',name:'Folga Total > 50% da Duração Remanescente',group:'Restrições e Folgas',found:v.length,foundPct:p,limit:'≤ 5%',pass:ok,impact:'Atividades com folga excessiva podem indicar lógica ausente ou datas incorretas.',fix:'Revise as conexões das atividades com alta folga e adicione predecessores/sucessores conforme necessário.',pts:ok?6:Math.max(0,6-Math.round(p/5)),maxPts:6,rows:v.map(a=>({id:a.id,name:a.name,status:a.status,ev:`Folga Total = ${round2(a.tf)}d`}))});}
+  else push({id:'tf50',name:'Folga Total > 50% da Duração Remanescente',group:'Restrições e Folgas',found:0,foundPct:0,limit:'≤ 5%',pass:null,impact:'Coluna Folga Total não encontrada.',fix:'Exporte o campo "Total Float".',pts:0,maxPts:6,rows:[],isNA:true});
+  if(durLimit){const v=acts.filter(a=>!a.isMilestone&&a.durD>durLimit);const p=pct100(v.length,total);const ok=p<=5;push({id:'dur10',name:'Duração da atividade > 10% da duração do projeto',group:'Duração e Datas',found:v.length,foundPct:p,limit:'≤ 5%',pass:ok,impact:'Atividades muito longas reduzem o controle e a precisão do cronograma.',fix:'Divida atividades longas em sub-atividades de no máximo alguns dias.',pts:ok?7:Math.max(0,7-Math.round(p/5)*2),maxPts:7,rows:v.map(a=>({id:a.id,name:a.name,status:a.status,ev:`Duração Original = ${round2(a.durD)}d > Limite = ${round2(durLimit)}d`}))});}
+  else push({id:'dur10',name:'Duração da atividade > 10% da duração do projeto',group:'Duração e Datas',found:0,foundPct:0,limit:'≤ 5%',pass:null,impact:'Datas de início/término do projeto não encontradas.',fix:'Inclua colunas Start/Finish ou defina as datas do projeto.',pts:0,maxPts:7,rows:[],isNA:true});
+  {const v=acts.filter(a=>hasStartFinish&&(!a.start||!a.finish||(a.start&&a.finish&&a.finish<a.start)));const p=pct100(v.length,total);const ok=v.length===0;push({id:'inv',name:'Datas inválidas (Invalid Dates)',group:'Duração e Datas',found:v.length,foundPct:p,limit:'0%',pass:ok,impact:'Datas inválidas quebram o cálculo de rede e geram resultados imprevisíveis.',fix:'Revise atividades com datas faltantes ou onde o término é anterior ao início.',pts:ok?5:Math.max(0,5-v.length),maxPts:5,rows:v.map(a=>({id:a.id,name:a.name,status:a.status,ev:!a.start?'Sem data início':!a.finish?'Sem data término':'Término < Início'}))});}
+  if(hasTF){const c=acts.filter(a=>a.tf!==null&&a.tf<=0);const p=pct100(c.length,total);const ok=p>=10&&p<=25;push({id:'cp',name:'% Caminho Crítico (Critical Path %)',group:'Crítico / Quase Crítico / Rede',found:c.length,foundPct:p,limit:'10%–25%',pass:ok,impact:p<10?'Poucas atividades críticas podem indicar rede mal conectada.':p>25?'Excesso de atividades críticas reduz a margem de manobra.':'Percentual adequado de atividades no caminho crítico.',fix:p<10?'Verifique se a rede está corretamente conectada e se os vínculos são realistas.':'Revise folgas e restrições para reduzir o número de atividades críticas.',pts:ok?7:Math.max(0,7-Math.round(Math.abs(p-17.5)/5)),maxPts:7,rows:c.slice(0,200).map(a=>({id:a.id,name:a.name,status:a.status,ev:`Folga Total = ${round2(a.tf)}d`}))});}
+  else push({id:'cp',name:'% Caminho Crítico',group:'Crítico / Quase Crítico / Rede',found:0,foundPct:0,limit:'10%–25%',pass:null,impact:'Coluna Folga Total não encontrada.',fix:'Exporte Total Float.',pts:0,maxPts:7,rows:[],isNA:true});
+  if(hasTF){const nc=acts.filter(a=>a.tf!==null&&a.tf>0&&a.tf<=7);const p=pct100(nc.length,total);const ok=p<=20;push({id:'nc',name:'% Quase Crítico (Near Critical, TF 0.1–7d)',group:'Crítico / Quase Crítico / Rede',found:nc.length,foundPct:p,limit:'≤ 20%',pass:ok,impact:'Muitas atividades quase críticas aumentam o risco de novos caminhos críticos.',fix:'Monitore de perto as atividades quase críticas e avalie buffers ou lógica adicional.',pts:ok?5:Math.max(0,5-Math.round((p-20)/5)),maxPts:5,rows:nc.slice(0,200).map(a=>({id:a.id,name:a.name,status:a.status,ev:`Folga Total = ${round2(a.tf)}d`}))});}
+  else push({id:'nc',name:'% Quase Crítico',group:'Crítico / Quase Crítico / Rede',found:0,foundPct:0,limit:'≤ 20%',pass:null,impact:'Coluna Folga Total não encontrada.',fix:'Exporte Total Float.',pts:0,maxPts:5,rows:[],isNA:true});
+  {let tl=0;acts.forEach(a=>{tl+=a.predecessors.length+(a.successors||[]).length;});const avg=total>0?tl/total:0;const ok=avg>=1.8&&avg<=2.5;push({id:'lt',name:'Média de vínculos por atividade (Logic Ties)',group:'Crítico / Quase Crítico / Rede',found:round2(avg),foundPct:null,limit:'1.8–2.5 vínculos',pass:ok,impact:avg<1.8?'Rede pouco conectada – muitas atividades com lógica faltante.':avg>2.5?'Excesso de vínculos pode indicar redundâncias na rede.':'Conectividade da rede dentro do padrão.',fix:avg<1.8?'Adicione vínculos predecessores/sucessores faltantes.':'Revise vínculos redundantes e simplifique a rede.',pts:ok?6:Math.max(0,6-Math.round(Math.abs(avg-2.15)*3)),maxPts:6,rows:[],isMedian:true});}
+  {const idMap={};acts.forEach(a=>{idMap[a.id]=a;});const v=acts.filter(a=>{if(a.pct<=0)return false;return a.predecessors.some(p=>{const pred=idMap[p.uid];return pred&&pred.pct<100&&pred.status!=='Concluída';});});const p=pct100(v.length,total);const ok=p===0;push({id:'oos',name:'Fora de sequência (Out of Sequence)',group:'Execução / Status',found:v.length,foundPct:p,limit:'0%',pass:ok,impact:'Atividades iniciadas sem predecessor concluído violam a lógica e distorcem o progresso.',fix:'Revise o status das atividades predecessoras ou corrija a lógica de rede.',pts:ok?6:Math.max(0,6-v.length),maxPts:6,rows:v.map(a=>({id:a.id,name:a.name,status:a.status,ev:`${round2(a.pct)}% concluída mas predecessora incompleta`}))});}
+  if(G.statusDate){const sd=G.statusDate;const v=acts.filter(a=>{if(a.status==='Concluída'||a.status==='Não Iniciada')return false;return a.start&&a.start<=sd&&(!a.finish||a.finish>=sd);});const p=pct100(v.length,total);const ok=p===0;push({id:'rdd',name:'Atividades na Data de Status (Riding Data Date)',group:'Execução / Status',found:v.length,foundPct:p,limit:'0%',pass:ok,impact:'Atividades "penduradas" na Data Date indicam que o progresso não foi atualizado.',fix:'Atualize o % de avanço e as datas remanescentes para todas as atividades em andamento.',pts:ok?5:Math.max(0,5-Math.round(p/5)),maxPts:5,rows:v.map(a=>({id:a.id,name:a.name,status:a.status,ev:`Em andamento sobre Data Date ${fmtDate(sd)}`}))});}
+
+  const aud=criteria.filter(c=>!c.isNA);
+  const ptsObt=aud.reduce((s,c)=>s+c.pts,0);
+  const ptsMax=aud.reduce((s,c)=>s+c.maxPts,0);
+  const score=ptsMax>0?Math.round((ptsObt/ptsMax)*100):0;
+  const cov=pct100(aud.length,criteria.length);
+  REPORT={criteria,score,coverage:cov,total,projDurDays,hasTF};
+}
+
+// ══════════════════════════════════════════
+//  RENDER REPORT
+// ══════════════════════════════════════════
+function renderReport(revLabel,revDate,prevRev){
+  document.getElementById('rpt-project').textContent=G.projectName||'Cronograma';
+  document.getElementById('rpt-data-date').textContent=fmtDate(G.statusDate);
+  document.getElementById('rpt-start').textContent=fmtDate(G.startDate);
+  document.getElementById('rpt-finish').textContent=fmtDate(G.finishDate);
+  document.getElementById('rpt-rev').textContent=revLabel||'—';
+  document.getElementById('rpt-date').textContent=revDate||new Date().toLocaleDateString('pt-BR');
+
+  // compare bar
+  const cmpBar=document.getElementById('compare-bar');
+  if(prevRev){
+    document.getElementById('cmp-rev-name').textContent=prevRev.label||'Revisão anterior';
+    document.getElementById('cmp-prev-score').textContent=prevRev.score;
+    document.getElementById('cmp-curr-score').textContent=REPORT.score;
+    const diff=REPORT.score-prevRev.score;
+    const diffEl=document.getElementById('cmp-diff');
+    diffEl.textContent=diff>0?`▲ +${diff} pontos vs revisão anterior`:diff<0?`▼ ${diff} pontos vs revisão anterior`:'= Sem variação vs revisão anterior';
+    diffEl.style.color=diff>0?'#10b981':diff<0?'#ef4444':'rgba(255,255,255,.5)';
+    cmpBar.style.display='flex';
+  } else cmpBar.style.display='none';
+
+  // score
+  const s=REPORT.score;
+  const circle=document.getElementById('score-circle');
+  circle.style.background=s>=70?'#065f46':s>=50?'#78350f':'#7f1d1d';
+  document.getElementById('score-num').textContent=s;
+  const audCount=REPORT.criteria?REPORT.criteria.filter(c=>!c.isNA).length:0;
+  const totCount=REPORT.criteria?REPORT.criteria.length:0;
+  document.getElementById('score-text').textContent=`O SV Score mede a conformidade do cronograma em relação às boas práticas DCMA 14 pontos e ao padrão 2026 Scoring Standard. Pontuação obtida em ${audCount} critérios auditáveis de ${totCount} critérios totais.`;
+  document.getElementById('score-cov').textContent=REPORT.coverage+'%';
+  document.getElementById('score-act').textContent=REPORT.total;
+  const risk=s>=70?{label:'Baixo',cls:'risk-baixo'}:s>=50?{label:'Médio',cls:'risk-medio'}:{label:'Alto',cls:'risk-alto'};
+  document.getElementById('risk-badge-wrap').innerHTML=`<span class="risk-badge ${risk.cls}">Risco: ${risk.label}</span>`;
+
+  if(!REPORT.criteria)return;
+
+  // top causes
+  const failed=REPORT.criteria.filter(c=>!c.isNA&&!c.pass).sort((a,b)=>(b.maxPts-b.pts)-(a.maxPts-a.pts));
+  const causesEl=document.getElementById('top-causes');
+  causesEl.innerHTML=failed.slice(0,5).map((c,i)=>`<li>${i+1}. <b>${c.name}</b> – perdeu <span>${c.maxPts-c.pts} ptos</span> (${c.foundPct}% de violação)`).join('');
+  if(!causesEl.innerHTML)causesEl.innerHTML='<li>Nenhum critério reprovado. Excelente cronograma!</li>';
+
+  // action plan
+  const ag=document.getElementById('action-grid');
+  const actions=[];
+  REPORT.criteria.forEach(c=>{if(!c.isNA&&!c.pass){const diff=c.maxPts-c.pts;actions.push({pri:diff>=6?'alta':diff>=3?'media':'baixa',name:c.name,fix:c.fix});}});
+  actions.sort((a,b)=>({'alta':0,'media':1,'baixa':2}[a.pri]-{'alta':0,'media':1,'baixa':2}[b.pri]));
+  ag.innerHTML=actions.map(a=>`<div class="action-item ${a.pri}"><div class="pri">Prioridade ${a.pri.toUpperCase()}</div><b>${a.name}</b><p>${a.fix}</p></div>`).join('')||'<p style="color:var(--text-muted)">Nenhuma ação necessária.</p>';
+
+  // index nav
+  document.getElementById('index-nav').innerHTML=REPORT.criteria.map(c=>`<a href="#crit-${c.id}">${c.name.split('(')[0].trim()}</a>`).join('');
+
+  // criteria cards
+  const grid=document.getElementById('criteria-grid');
+  grid.innerHTML='';
+  REPORT.criteria.forEach(c=>{
+    const cls=c.isNA?'na':c.pass?'pass':'fail';
+    const stLbl=c.isNA?'N/A':c.pass?'PASSOU':'FALHOU';
+    const ptsLbl=c.isNA?'N/A':`pontuou ${c.pts} de ${c.maxPts}`;
+    const foundStr=c.isMedian?`Média: ${c.found} vínculos/atividade`:`${c.found} atividades (${c.foundPct!==null?c.foundPct+'%':''})`;
+    const card=document.createElement('div');
+    card.className=`crit-card ${cls}`;card.id=`crit-${c.id}`;
+    card.innerHTML=`<div class="crit-card-header"><span class="crit-name">● ${c.name}</span><span class="crit-status">${stLbl}</span></div><div class="crit-body"><div class="row"><span>Encontrado</span><span>${foundStr}</span></div><div class="row"><span>Limite / Meta</span><span>${c.limit}</span></div><div class="row"><span>Impacto</span><span></span></div><p style="font-size:.8rem;margin:.3rem 0">${c.impact}</p><div class="row"><span>Como corrigir</span><span></span></div><p style="font-size:.8rem;margin:.3rem 0">${c.fix}</p></div><div class="score-pts">${ptsLbl}</div>`;
+    grid.appendChild(card);
+  });
+
+  // smart suggestions
+  const acts_sug = G.activities ? G.activities.filter(a=>!a.isSummary) : [];
+  const suggestions = buildSmartSuggestions();
+  renderSuggestions(suggestions, acts_sug);
+
+  // annexes
+  const ann=document.getElementById('annexes');ann.innerHTML='';
+  REPORT.criteria.forEach(c=>{
+    if(!c.rows||!c.rows.length)return;
+    const wrap=document.createElement('div');wrap.className='annex-section';wrap.style.marginBottom='1rem';
+    wrap.innerHTML=`<div class="annex-header" onclick="toggleAnnex(this)">${c.name} (N=${c.rows.length})<span class="toggle-icon">▼</span></div><div class="annex-body" id="annex-${c.id}"><table><thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Evidência/Valor</th></tr></thead><tbody>${c.rows.map(r=>`<tr><td>${r.id}</td><td>${r.name}</td><td>${r.status}</td><td class="ev">${r.ev}</td></tr>`).join('')}</tbody></table></div>`;
+    ann.appendChild(wrap);
+  });
+
+  window.addEventListener('scroll',()=>{document.getElementById('btn-top').style.display=window.scrollY>400?'flex':'none';});
+}
+
+
+// ══════════════════════════════════════════
+//  SMART SUGGESTIONS ENGINE
+// ══════════════════════════════════════════
+function buildSmartSuggestions() {
+  if (!G.activities || !G.activities.length) return {};
+  const acts = G.activities.filter(a => !a.isSummary);
+  const map  = {};
+  acts.forEach(a => { map[a.id] = a; });
+
+  // ordered index (by start date, then by position in array)
+  const ordered = [...acts].sort((a,b) => {
+    if (a.start && b.start) return a.start - b.start;
+    return 0;
+  });
+  const posIdx = {};
+  ordered.forEach((a,i) => { posIdx[a.id] = i; });
+
+  // find milestones (or near-milestones) as anchor candidates
+  const milestones = acts.filter(a => a.isMilestone || a.durD === 0);
+
+  // helper: find best successor candidate for an activity with open finish
+  function bestSuccCandidate(act) {
+    const pos = posIdx[act.id];
+    // look forward in ordered list for activities that have this one as predecessor cousin
+    // (share same predecessors' successors, or nearest by date after finish)
+    const after = ordered.filter(b => {
+      if (b.id === act.id) return false;
+      if (b.isSummary) return false;
+      const bPos = posIdx[b.id];
+      return bPos > pos;
+    });
+    // prefer: already has act's predecessors' other successors
+    const actPredIds = act.predecessors.map(p => p.uid);
+    let best = null;
+    for (const b of after.slice(0, 40)) {
+      const bPredIds = b.predecessors.map(p => p.uid);
+      const shared = actPredIds.filter(id => bPredIds.includes(id));
+      if (shared.length > 0) { best = b; break; }
+    }
+    // fallback: nearest milestone after act
+    if (!best) {
+      const mAfter = milestones.filter(m => posIdx[m.id] > pos);
+      if (mAfter.length) best = mAfter[0];
+    }
+    // fallback: first activity after
+    if (!best && after.length) best = after[0];
+    return best;
+  }
+
+  // helper: find best predecessor candidate for open start
+  function bestPredCandidate(act) {
+    const pos = posIdx[act.id];
+    const before = ordered.filter(b => {
+      if (b.id === act.id) return false;
+      if (b.isSummary) return false;
+      return posIdx[b.id] < pos;
+    });
+    // prefer: shares successors with act's successors
+    const actSuccIds = (act.successors||[]).map(s => s.uid);
+    let best = null;
+    for (const b of before.slice().reverse().slice(0, 40)) {
+      const bSuccIds = (b.successors||[]).map(s => s.uid);
+      const shared = actSuccIds.filter(id => bSuccIds.includes(id));
+      if (shared.length > 0) { best = b; break; }
+    }
+    if (!best && before.length) best = before[before.length - 1];
+    return best;
+  }
+
+  // helper: short label for an activity
+  function lbl(a) {
+    if (!a) return '?';
+    const nm = a.name ? (a.name.length > 35 ? a.name.slice(0,33)+'…' : a.name) : a.id;
+    return `${a.id} – ${nm}`;
+  }
+
+  const suggestions = {}; // id -> [{cmd, reason, conf}]
+
+  // ── Open Start ──
+  acts.filter(a => !a.isMilestone && a.predecessors.length === 0).forEach(act => {
+    const cand = bestPredCandidate(act);
+    const cmd  = cand ? `${cand.id} → ${act.id}  FS` : `Criar marco de início → ${act.id}  FS`;
+    const reason = cand
+      ? `"${cand.name ? cand.name.slice(0,40) : cand.id}" termina antes e compartilha rede próxima`
+      : 'Nenhuma atividade predecessora candidata encontrada na rede';
+    const conf = cand ? (posIdx[cand.id] === posIdx[act.id]-1 ? 'alta' : 'media') : 'baixa';
+    if (!suggestions[act.id]) suggestions[act.id] = [];
+    suggestions[act.id].push({ critério:'Open Start', cmd, reason, conf });
+  });
+
+  // ── Open Finish ──
+  acts.filter(a => !a.isMilestone && (!a.successors || a.successors.length === 0)).forEach(act => {
+    const cand = bestSuccCandidate(act);
+    const isMile = cand && cand.isMilestone;
+    const cmd  = cand
+      ? `${act.id} → ${cand.id}  FS`
+      : `${act.id} → [Criar marco de conclusão]  FS`;
+    const reason = cand
+      ? (isMile
+          ? `Marco "${cand.name ? cand.name.slice(0,35) : cand.id}" é o ponto de conclusão mais próximo`
+          : `"${cand.name ? cand.name.slice(0,40) : cand.id}" é a próxima atividade candidata na sequência`)
+      : 'Nenhum candidato encontrado — criar marco de conclusão de fase';
+    const conf = cand ? (isMile ? 'alta' : 'media') : 'baixa';
+    if (!suggestions[act.id]) suggestions[act.id] = [];
+    suggestions[act.id].push({ critério:'Open Finish', cmd, reason, conf });
+  });
+
+  // ── Lag negativo ──
+  acts.filter(a => a.predecessors.some(p => p.lag < 0)).forEach(act => {
+    act.predecessors.filter(p => p.lag < 0).forEach(p => {
+      const pred = map[p.uid];
+      const lagAbs = Math.abs(p.lag);
+      const cmd = `Substituir  ${p.uid} → ${act.id}  FS(lag ${p.lag}d)  por:\n  Opção A: ${p.uid} → ${act.id}  SS+${lagAbs}d\n  Opção B: Criar atividade intermediária de ${lagAbs}d entre ${p.uid} e ${act.id}`;
+      const reason = `Lag negativo de ${p.lag}d comprime artificialmente o cronograma`;
+      if (!suggestions[act.id]) suggestions[act.id] = [];
+      suggestions[act.id].push({ critério:'Lag Negativo', cmd, reason, conf:'alta' });
+    });
+  });
+
+  // ── FS com lag positivo ──
+  acts.filter(a => a.predecessors.some(p => p.lag > 0 && (p.type==='FS'||!p.type))).forEach(act => {
+    act.predecessors.filter(p => p.lag > 0 && (p.type==='FS'||!p.type)).forEach(p => {
+      const lagD = p.lag;
+      const cmd = `Criar atividade de espera/mobilização de ${lagD}d entre ${p.uid} e ${act.id}\n  Remover lag: ${p.uid} → [Nova ativ.] FS  →  ${act.id} FS`;
+      const reason = `Lag FS+${lagD}d esconde trabalho real não representado como atividade`;
+      if (!suggestions[act.id]) suggestions[act.id] = [];
+      suggestions[act.id].push({ critério:'Lag FS Positivo', cmd, reason, conf:'media' });
+    });
+  });
+
+  // ── Folga Negativa ──
+  acts.filter(a => a.tf !== null && a.tf < 0).forEach(act => {
+    // trace: find which predecessor or constraint is likely causing it
+    const hardPreds = act.predecessors.filter(p => {
+      const pred = map[p.uid];
+      return pred && pred.tf !== null && pred.tf < 0;
+    });
+    const hasConstraint = act.constraint && String(act.constraint).match(/[2-5]|7|8|MFO|MSO|FNET|SNLT/i);
+    let cmd, reason;
+    if (hasConstraint) {
+      cmd    = `Remover/suavizar restrição "${act.constraint}" em ${act.id}`;
+      reason = `Restrição dura é causa provável da folga negativa de ${round2(act.tf)}d`;
+    } else if (hardPreds.length) {
+      cmd    = `Revisar vínculo de ${hardPreds[0].uid} → ${act.id} (pred. também com folga negativa)`;
+      reason = `Folga negativa propagada da predecessora ${hardPreds[0].uid} (TF=${round2(map[hardPreds[0].uid].tf)}d)`;
+    } else {
+      cmd    = `Revisar rede a partir de ${act.id} — verificar restrições ou datas fixas nos predecessores`;
+      reason = `Folga de ${round2(act.tf)}d — causa raiz não identificável sem restrições explícitas`;
+    }
+    if (!suggestions[act.id]) suggestions[act.id] = [];
+    suggestions[act.id].push({ critério:'Folga Negativa', cmd, reason, conf: hasConstraint ? 'alta' : hardPreds.length ? 'media' : 'baixa' });
+  });
+
+  // ── Folga Total > 50% rem ──
+  acts.filter(a => a.tf !== null && !isNaN(a.tf) && (a.remD||a.durD) > 0 && a.tf > (a.remD||a.durD)*0.5).forEach(act => {
+    const succCount = (act.successors||[]).length;
+    let cmd, reason;
+    if (succCount === 0) {
+      const cand = bestSuccCandidate(act);
+      cmd    = cand ? `Vincular ${act.id} → ${cand.id}  FS  (ou marco de conclusão)` : `Criar marco de conclusão como sucessor de ${act.id}`;
+      reason = `TF=${round2(act.tf)}d muito alta — atividade sem sucessor adequado na rede`;
+    } else {
+      const succ = map[act.successors[0].uid];
+      const gap  = (act.finish && succ && succ.start) ? Math.round((succ.start - act.finish)/86400000) : null;
+      cmd    = gap && gap > 5
+        ? `Reduzir gap entre ${act.id} e ${act.successors[0].uid}: gap atual ≈ ${gap}d — verificar se há atividade faltante`
+        : `Verificar se há atividade intermediária faltante entre ${act.id} e ${act.successors[0].uid}`;
+      reason = `TF=${round2(act.tf)}d sugere descontinuidade na rede após esta atividade`;
+    }
+    if (!suggestions[act.id]) suggestions[act.id] = [];
+    suggestions[act.id].push({ critério:'Folga Alta >50%', cmd, reason, conf: succCount===0 ? 'media' : 'baixa' });
+  });
+
+  // ── Hard Constraint ──
+  const hardTypes = ['2','3','4','5','7','8','MFO','MSO','FNLT','FNET','SNLT','SNET'];
+  const softMap   = {'2':'SNET','3':'FNLT','4':'SNET','5':'FNLT','7':'FNLT','8':'SNET','MFO':'FNLT','MSO':'SNET','FNLT':'FNLT','FNET':'SNET','SNLT':'SNET','SNET':'SNET'};
+  acts.filter(a => a.constraint && hardTypes.some(h => String(a.constraint).includes(h) || String(a.constraint).toUpperCase().includes(h))).forEach(act => {
+    const ct   = String(act.constraint).toUpperCase();
+    const soft = Object.entries(softMap).find(([k]) => ct.includes(k));
+    const suggested = soft ? soft[1] : 'SNET';
+    const cmd    = `Substituir restrição dura "${act.constraint}" por "${suggested}" em ${act.id}\n  Ou remover restrição e usar lógica de rede`;
+    const reason = `Restrição dura bloqueia recálculo automático pelo CPM`;
+    if (!suggestions[act.id]) suggestions[act.id] = [];
+    suggestions[act.id].push({ critério:'Hard Constraint', cmd, reason, conf:'alta' });
+  });
+
+  // ── Out of Sequence ──
+  const idMap = {};
+  acts.forEach(a => { idMap[a.id] = a; });
+  acts.filter(a => a.pct > 0).forEach(act => {
+    const badPreds = act.predecessors.filter(p => {
+      const pred = idMap[p.uid];
+      return pred && pred.pct < 100 && pred.status !== 'Concluída';
+    });
+    badPreds.forEach(p => {
+      const pred = idMap[p.uid];
+      const cmd  = pred.pct > 0
+        ? `Atualizar "${pred.id}" para 100% antes de lançar avanço em "${act.id}"\n  Ou: remover vínculo ${pred.id} → ${act.id} se a lógica mudou`
+        : `Iniciar "${pred.id}" (${pred.name ? pred.name.slice(0,35) : pred.id}) antes de continuar "${act.id}"`;
+      const reason = `${act.id} está ${round2(act.pct)}% concluída mas predecessora ${pred.id} está apenas ${round2(pred.pct)}% concluída`;
+      if (!suggestions[act.id]) suggestions[act.id] = [];
+      suggestions[act.id].push({ critério:'Fora de Sequência', cmd, reason, conf:'alta' });
+    });
+  });
+
+  return suggestions;
+}
+
+// ── Build pattern clusters ──
+function buildPatterns(suggestions, acts) {
+  const map = {};
+  acts.forEach(a => { map[a.id] = a; });
+
+  const byCrit = {};
+  Object.entries(suggestions).forEach(([actId, sugs]) => {
+    sugs.forEach(s => {
+      if (!byCrit[s.critério]) byCrit[s.critério] = [];
+      byCrit[s.critério].push(actId);
+    });
+  });
+
+  const patterns = [];
+
+  // Open Finish cluster → common milestone
+  if (byCrit['Open Finish'] && byCrit['Open Finish'].length >= 2) {
+    const ids = byCrit['Open Finish'];
+    // find most-suggested target across all open-finish suggestions
+    const targets = {};
+    ids.forEach(id => {
+      suggestions[id].filter(s => s.critério==='Open Finish').forEach(s => {
+        const m = s.cmd.match(/→ ([^\s]+)/);
+        if (m) targets[m[1]] = (targets[m[1]]||0)+1;
+      });
+    });
+    const topTarget = Object.entries(targets).sort((a,b)=>b[1]-a[1])[0];
+    const desc = topTarget && topTarget[1] >= 2
+      ? `${ids.length} atividades sem sucessor convergem para o mesmo alvo provável: <b>${topTarget[0]}</b>. Vinculá-las em bloco via FS reduz o esforço de correção.`
+      : `${ids.length} atividades sem sucessor. Verificar se existe um marco de conclusão de fase adequado para receber todas.`;
+    patterns.push({ title:`Open Finish — ${ids.length} atividades`, ids, action: topTarget ? `Vincular todas → ${topTarget[0]}  FS` : 'Criar marco de conclusão e vincular todas  FS', desc });
+  }
+
+  // Open Start cluster
+  if (byCrit['Open Start'] && byCrit['Open Start'].length >= 2) {
+    const ids = byCrit['Open Start'];
+    patterns.push({ title:`Open Start — ${ids.length} atividades`, ids, action:'Verificar marco de início ou predecessora comum para vincular em bloco', desc:`${ids.length} atividades sem predecessora. Agrupar por fase/disciplina pode revelar um marco comum de início.` });
+  }
+
+  // Hard Constraint cluster
+  if (byCrit['Hard Constraint'] && byCrit['Hard Constraint'].length >= 2) {
+    const ids = byCrit['Hard Constraint'];
+    patterns.push({ title:`Hard Constraints — ${ids.length} atividades`, ids, action:'Substituir restrições duras por SNET/FNLT em lote no P6/MSP', desc:`Concentração de ${ids.length} restrições duras — provável importação de datas fixas. Remover em lote e substituir por lógica de rede.` });
+  }
+
+  // Lag negativo cluster
+  if (byCrit['Lag Negativo'] && byCrit['Lag Negativo'].length >= 2) {
+    const ids = byCrit['Lag Negativo'];
+    patterns.push({ title:`Lag Negativo — ${ids.length} atividades`, ids, action:'Revisar template de vínculos — padrão de lead sugere importação automática', desc:`${ids.length} atividades com lag negativo. Padrão indica possível uso sistemático de leads — revisar template de importação.` });
+  }
+
+  // Out of sequence cluster
+  if (byCrit['Fora de Sequência'] && byCrit['Fora de Sequência'].length >= 2) {
+    const ids = byCrit['Fora de Sequência'];
+    patterns.push({ title:`Fora de Sequência — ${ids.length} atividades`, ids, action:'Realizar batimento de avanço físico com o cronograma antes da próxima atualização', desc:`${ids.length} atividades iniciadas sem predecessoras concluídas. Indica descontinuidade entre dados de campo e atualização do cronograma.` });
+  }
+
+  return patterns;
+}
+
+// ── Render suggestions in report ──
+function renderSuggestions(suggestions, acts) {
+  const container = document.getElementById('suggestions-container');
+  const patternsContainer = document.getElementById('patterns-container');
+  const actMap = {};
+  acts.forEach(a => { actMap[a.id] = a; });
+
+  // Group by criterion
+  const byCrit = {};
+  Object.entries(suggestions).forEach(([actId, sugs]) => {
+    sugs.forEach(s => {
+      if (!byCrit[s.critério]) byCrit[s.critério] = [];
+      byCrit[s.critério].push({ actId, ...s, actName: actMap[actId] ? actMap[actId].name : '' });
+    });
+  });
+
+  container.innerHTML = '';
+  if (!Object.keys(byCrit).length) {
+    container.innerHTML = '<p style="color:var(--text-muted);padding:.5rem 0">Nenhuma sugestão específica gerada — todos os critérios aprovados ou sem dados de vínculo suficientes.</p>';
+  }
+
+  // Priority order
+  const critOrder = ['Fora de Sequência','Folga Negativa','Open Start','Open Finish','Hard Constraint','Lag Negativo','Lag FS Positivo','Folga Alta >50%'];
+  const sorted = Object.entries(byCrit).sort((a,b) => {
+    return (critOrder.indexOf(a[0]) === -1 ? 99 : critOrder.indexOf(a[0])) -
+           (critOrder.indexOf(b[0]) === -1 ? 99 : critOrder.indexOf(b[0]));
+  });
+
+  sorted.forEach(([crit, rows]) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'sug-section';
+    const confIcon = { alta:'🔴', media:'🟡', baixa:'🔵' };
+    const tbody = rows.map(r => {
+      const cmds = r.cmd.split('\n').map(l => `<div class="sug-cmd">${l.trim()}</div>`).join('');
+      return `<tr>
+        <td><span class="sug-act-id">${r.actId}</span><div style="font-size:.73rem;color:var(--text-muted);margin-top:1px">${r.actName ? r.actName.slice(0,45) : ''}</div></td>
+        <td>${cmds}<div class="sug-reason">${r.reason}</div></td>
+        <td><span class="sug-conf conf-${r.conf}">${confIcon[r.conf]||''} ${r.conf.charAt(0).toUpperCase()+r.conf.slice(1)}</span></td>
+      </tr>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <div class="sug-header" onclick="toggleSug(this)">
+        ${crit} <span style="font-size:.75rem;color:var(--text-muted);font-weight:400">${rows.length} atividade(s)</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+      <div class="sug-body">
+        <table class="sug-table">
+          <thead><tr><th style="width:140px">Atividade</th><th>Ação Sugerida</th><th style="width:90px">Confiança</th></tr></thead>
+          <tbody>${tbody}</tbody>
+        </table>
+      </div>`;
+    container.appendChild(wrap);
+  });
+
+  // Patterns
+  const patterns = buildPatterns(suggestions, acts);
+  patternsContainer.innerHTML = '';
+  if (!patterns.length) {
+    patternsContainer.innerHTML = '<p style="color:var(--text-muted);padding:.5rem 0">Nenhum padrão de cluster identificado.</p>';
+    return;
+  }
+  const grid = document.createElement('div');
+  grid.className = 'pattern-grid';
+  patterns.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'pattern-card';
+    const idHtml = p.ids.slice(0,20).map(id=>`<span class="pattern-id">${id}</span>`).join('') + (p.ids.length>20?`<span class="pattern-id">+${p.ids.length-20}</span>`:'');
+    card.innerHTML = `
+      <div class="pattern-card-head">
+        <span>${p.title}</span>
+        <span class="pc-count">${p.ids.length} atividades</span>
+      </div>
+      <div class="pattern-card-body">
+        <p>${p.desc}</p>
+        <div class="pattern-ids">${idHtml}</div>
+        <div class="pattern-action">→ ${p.action}</div>
+      </div>`;
+    grid.appendChild(card);
+  });
+  patternsContainer.appendChild(grid);
+}
+
+function toggleSug(header) {
+  header.classList.toggle('open');
+  header.nextElementSibling.classList.toggle('open');
+}
+
+function toggleAnnex(h){h.classList.toggle('open');h.nextElementSibling.classList.toggle('open');}
+function filterTables(q){q=q.toLowerCase();document.querySelectorAll('.annex-body tbody tr').forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';});}
+function filterCards(type,btn){document.querySelectorAll('.toolbar button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.crit-card').forEach(card=>{card.style.display=type==='all'?'':card.classList.contains(type)?'':'none';});}
+function exportReport(){
+  const html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>DCMA Relatório</title><style>'+document.querySelector('style').textContent+'</style></head><body><nav class="topnav"><div class="nav-left"><div class="nav-avatar">KG</div><div><div class="nav-name">Kauê Gutierres</div><div class="nav-sub">Consultoria &amp; Gestão de Projetos de Infraestrutura</div></div></div></nav>'+document.getElementById('report-screen').outerHTML+'</body></html>';
+  const blob=new Blob([html],{type:'text/html'});
+  const a=document.createElement('a');
+  const proj=(G.projectName||'Relatorio').replace(/[^a-z0-9]/gi,'_');
+  const dt=new Date().toISOString().slice(0,10).replace(/-/g,'');
+  a.href=URL.createObjectURL(blob);a.download=`SVScore_${proj}_${dt}.html`;a.click();
+}
+</script>
+</body>
+</html>
