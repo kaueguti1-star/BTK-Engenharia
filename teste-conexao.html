@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>KG — Teste de Conexão Supabase</title>
+<style>
+  body { font-family: monospace; background: #0a0f1e; color: #e2e8f0; padding: 30px; }
+  h2 { color: #60a5fa; }
+  .step { margin: 12px 0; padding: 12px 16px; border-radius: 6px; background: #0f2040; border-left: 4px solid #1e3a6e; }
+  .ok   { border-color: #22c55e; color: #86efac; }
+  .err  { border-color: #ef4444; color: #fca5a5; }
+  .wait { border-color: #f59e0b; color: #fcd34d; }
+  input { background: #0f2040; border: 1px solid #1e3a6e; color: #e2e8f0; padding: 8px 12px; border-radius: 6px; width: 280px; margin: 4px 0; display: block; }
+  button { background: #2563b8; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin-top: 10px; font-size: 14px; }
+</style>
+</head>
+<body>
+<h2>🔍 Teste de Conexão — KG Plataforma</h2>
+
+<div class="step wait" id="s1">⏳ Carregando SDK do Supabase...</div>
+<div class="step wait" id="s2">⏳ Inicializando cliente...</div>
+<div class="step wait" id="s3">⏳ Aguardando teste de login...</div>
+
+<div style="margin-top:20px">
+  <input type="email" id="email" placeholder="seu@email.com" value="kaueguti1@gmail.com">
+  <input type="password" id="pw" placeholder="sua senha">
+  <button onclick="testarLogin()">Testar Login</button>
+</div>
+
+<div class="step wait" id="s4" style="display:none">⏳ Tentando login...</div>
+<div class="step wait" id="s5" style="display:none">⏳ Buscando perfil...</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL     = 'https://uybgtupjkswtkqisipom.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable__GlW2nbjJfGmYoBM27KqYg_oCZ6pjpQ';
+
+function ok(id, msg)  { const el=document.getElementById(id); el.className='step ok';   el.textContent='✅ '+msg; }
+function err(id, msg) { const el=document.getElementById(id); el.className='step err';  el.textContent='❌ '+msg; }
+function wait(id, msg){ const el=document.getElementById(id); el.className='step wait'; el.textContent='⏳ '+msg; el.style.display='block'; }
+
+// Step 1: SDK carregado?
+if (typeof window.supabase !== 'undefined') {
+  ok('s1', 'SDK carregado OK — versão ' + (window.supabase.version || '2.x'));
+} else {
+  err('s1', 'SDK NÃO carregou — verifique conexão com internet');
+}
+
+// Step 2: Cliente inicializado?
+let sb;
+try {
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  ok('s2', 'Cliente criado OK — URL: ' + SUPABASE_URL);
+} catch(e) {
+  err('s2', 'Erro ao criar cliente: ' + e.message);
+}
+
+async function testarLogin() {
+  const email = document.getElementById('email').value.trim();
+  const pw    = document.getElementById('pw').value;
+
+  wait('s3', 'Aguardando...');
+  wait('s4', 'Tentando signInWithPassword...');
+  wait('s5', 'Aguardando perfil...');
+
+  // Step 3: Testa conexão básica
+  try {
+    const { data: hc } = await sb.auth.getSession();
+    ok('s3', 'Conexão com Supabase OK — sessão atual: ' + (hc.session ? hc.session.user.email : 'nenhuma'));
+  } catch(e) {
+    err('s3', 'Falha de conexão: ' + e.message);
+    return;
+  }
+
+  // Step 4: Login
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+  if (error) {
+    err('s4', 'Erro no login: ' + error.message + ' (status: ' + error.status + ')');
+    return;
+  }
+  ok('s4', 'Login OK — usuário: ' + data.user.email + ' | id: ' + data.user.id);
+
+  // Step 5: Busca perfil
+  const { data: profile, error: perr } = await sb.from('profiles').select('*').eq('id', data.user.id).single();
+  if (perr) {
+    err('s5', 'Erro ao buscar perfil: ' + perr.message + ' | code: ' + perr.code);
+    return;
+  }
+  if (!profile) {
+    err('s5', 'Perfil não encontrado na tabela profiles para id=' + data.user.id);
+    return;
+  }
+  ok('s5', 'Perfil OK — role: ' + profile.role + ' | tools: ' + JSON.stringify(profile.tools) + ' | status: ' + profile.status);
+
+  // Resultado final
+  const div = document.createElement('div');
+  div.className = 'step ok';
+  div.innerHTML = '🎉 TUDO OK! Redirecionaria para: <strong>' + (profile.role==='admin' ? 'admin.html' : 'menu.html') + '</strong>';
+  document.body.appendChild(div);
+}
+</script>
+</body>
+</html>
