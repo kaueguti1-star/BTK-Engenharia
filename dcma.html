@@ -1,6 +1,111 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+   <!--
+  =====================================================================
+  KG PLATAFORMA — BLOCO DE AUTENTICAÇÃO
+  Cole este bloco logo após o <head> de cada ferramenta (pmo.html,
+  dcma.html, praticavel.html). Substitua URL e KEY pelos seus valores.
+  =====================================================================
+-->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function() {
+  // ----------------------------------------------------------------
+  // Configuração — mesmos valores do login.html e admin.html
+  // ----------------------------------------------------------------
+  const SUPABASE_URL      = 'https://uybgtupjkswtkqisipom.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable__GlW2nbjJfGmYoBM27KqYg_oCZ6pjpQ';
+  // ----------------------------------------------------------------
+
+  const isConfigured = SUPABASE_URL !== 'COLE_SUA_URL_AQUI' && SUPABASE_URL.startsWith('https://');
+  if (!isConfigured) return; // Em modo demo, não verifica sessão
+
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  window._kgSupabase = sb; // Disponível para o restante do app
+
+  // Verifica sessão ao carregar
+  sb.auth.getSession().then(async ({ data }) => {
+    if (!data.session) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('status, name, tools')
+      .eq('id', data.session.user.id)
+      .single();
+
+    if (!profile || profile.status === 'blocked') {
+      await sb.auth.signOut();
+      window.location.href = 'login.html?msg=acesso_bloqueado';
+      return;
+    }
+
+    // Expõe info do usuário globalmente
+    window._kgUser = {
+      id: data.session.user.id,
+      email: data.session.user.email,
+      name: profile.name,
+      tools: profile.tools
+    };
+  });
+
+  // Ouve mudanças de sessão (logout de outra aba, token expirado)
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') {
+      window.location.href = 'login.html';
+    }
+  });
+})();
+</script>
+
+<!--
+  COMO USAR OS DADOS DO USUÁRIO NA FERRAMENTA:
+  
+  window._kgUser.email   → e-mail do usuário logado
+  window._kgUser.name    → nome / empresa
+  window._kgUser.tools   → array de ferramentas liberadas ex: ['pmo','dcma']
+  window._kgSupabase     → cliente Supabase para salvar dados no banco
+
+  SALVAR DADOS DO PROJETO NO SUPABASE (opcional):
+  Se quiser que os dados do PMO fiquem no servidor em vez do localStorage,
+  use a tabela abaixo. Crie no SQL Editor do Supabase:
+
+  CREATE TABLE project_data (
+    id         UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id    UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    tool       TEXT,          -- 'pmo', 'dcma', 'praticavel'
+    project_id TEXT,          -- ID interno do projeto no app
+    data       JSONB,         -- conteúdo serializado (tarefas, avanços...)
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  ALTER TABLE project_data ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Usuário acessa próprios dados"
+    ON project_data FOR ALL
+    USING (auth.uid() = user_id);
+  
+  Para salvar:
+  await window._kgSupabase.from('project_data').upsert({
+    user_id: window._kgUser.id,
+    tool: 'pmo',
+    project_id: 'fmt-001',
+    data: { tasks: [...], progress: {...} },
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'user_id,tool,project_id' });
+
+  Para carregar:
+  const { data } = await window._kgSupabase
+    .from('project_data')
+    .select('data')
+    .eq('user_id', window._kgUser.id)
+    .eq('tool', 'pmo')
+    .eq('project_id', 'fmt-001')
+    .single();
+-->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Auditor DCMA 14 Pontos – KG Consultoria</title>
