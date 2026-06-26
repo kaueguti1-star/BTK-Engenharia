@@ -110,6 +110,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calculadora de Praticabilidade — KG Consultoria</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root {
     --kg-navy: #1a1f2e;
@@ -294,6 +296,60 @@
   }
   .jornada-opt .jh { font-size: 18px; font-weight: 700; color: var(--kg-blue-light); }
   .jornada-opt .jl { font-size: 11px; color: var(--kg-text-muted); margin-top: 3px; }
+
+  /* ── EXPORT ── */
+  .export-bar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-top: 14px; padding: 14px 18px;
+    background: var(--kg-surface2);
+    border: 1px solid var(--kg-border);
+    border-radius: var(--radius);
+  }
+  .export-label { font-size: 12px; color: var(--kg-text-muted); margin-right: 4px; font-weight: 600; }
+  .btn-export {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 16px; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    border: none; transition: opacity .2s, transform .1s;
+  }
+  .btn-export:hover { opacity: .85; }
+  .btn-export:active { transform: scale(.97); }
+  .btn-export:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-xlsx { background: #1D6F42; color: #fff; }
+  .btn-pptx { background: #B7472A; color: #fff; }
+
+  /* ── FATORES TABLE ── */
+  .fat-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  .fat-table th {
+    font-size: 11px; color: var(--kg-text-muted);
+    font-weight: 500; padding: 6px 10px;
+    text-align: left; border-bottom: 1px solid var(--kg-border);
+  }
+  .fat-table th:not(:first-child) { text-align: center; }
+  .fat-table td { padding: 5px 10px; border-bottom: 1px solid rgba(45,107,228,0.1); vertical-align: middle; }
+  .fat-table td:first-child { color: var(--kg-text); font-size: 12px; }
+  .fat-num {
+    width: 64px; padding: 5px 8px; text-align: center;
+    background: var(--kg-surface2);
+    border: 1px solid var(--kg-border);
+    border-radius: var(--radius-sm);
+    color: var(--kg-text);
+    font-size: 13px;
+    outline: none;
+  }
+  .fat-num:focus { border-color: var(--kg-blue); }
+  .fat-reset-btn {
+    background: rgba(45,107,228,0.12);
+    border: 1px solid var(--kg-border-bright);
+    color: var(--kg-blue-light);
+    border-radius: var(--radius-sm);
+    padding: 4px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background .2s;
+  }
+  .fat-reset-btn:hover { background: rgba(45,107,228,0.25); }
 
   /* ── SERVICES ── */
   .service-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 8px; }
@@ -528,12 +584,11 @@
 <header class="header">
   <div class="logo-box">KG</div>
   <div>
-    <div class="header-name">Kauê Gutierres</div>
-    <div class="header-sub">Consultoria &amp; Gestão de Projetos de Infraestrutura</div>
+    <div class="header-name">Praticabilidade</div>
+    <div class="header-sub">Calculadora de Dias Praticáveis · KG Consultoria</div>
   </div>
   <div class="header-right">
     <span class="badge-api">Open-Meteo · ERA5</span>
-    <span style="font-size:11px;">Calculadora de Praticabilidade</span>
   </div>
 </header>
 
@@ -571,7 +626,7 @@
   <div class="card">
     <div class="card-title"><span class="step-num">2</span> Calendário — Feriados por mês</div>
     <div style="font-size:11px;color:var(--kg-text-muted);margin-bottom:12px;">
-      Informe a quantidade de feriados não trabalhados em cada mês. Sábados e domingos são configurados pela jornada.
+      Feriados nacionais fixos já estão pré-preenchidos para o ano corrente (incluindo Páscoa, Carnaval e Corpus Christi calculados automaticamente). Edite conforme necessário. Sábados e domingos são configurados pela jornada.
     </div>
     <div style="overflow-x:auto;">
       <table class="fer-table" id="ferTable">
@@ -593,8 +648,29 @@
 
   <!-- ════ STEP 3 — SERVIÇOS ════ -->
   <div class="card">
-    <div class="card-title"><span class="step-num">3</span> Tipo de Serviço</div>
+    <div class="card-title"><span class="step-num">3</span> Tipo de Serviço &amp; Fatores de Retomada</div>
     <div class="service-grid" id="serviceGrid"></div>
+
+    <div style="margin-top:18px;">
+      <div class="card-title" style="margin-bottom:4px;font-size:11px;color:var(--kg-text-muted);font-weight:400;letter-spacing:0;">
+        Fatores de retomada por faixa de precipitação
+        <span style="font-weight:300;"> — número de dias improdutivos gerados por cada dia de chuva naquela faixa</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="fat-table" id="fatTable">
+          <thead>
+            <tr>
+              <th>Serviço</th>
+              <th>5–10 mm</th>
+              <th>10–20 mm</th>
+              <th>&gt; 20 mm</th>
+            </tr>
+          </thead>
+          <tbody id="fatBody"></tbody>
+        </table>
+      </div>
+      <button class="fat-reset-btn" onclick="resetFatores()">↺ Restaurar padrões</button>
+    </div>
   </div>
 
   <!-- ════ STEP 4 — PERÍODO + JORNADA ════ -->
@@ -660,6 +736,19 @@
         <div class="result-title">📊 Análise de Praticabilidade</div>
         <div class="result-sub" id="resultSubtitle"></div>
       </div>
+    </div>
+
+    <!-- exportar -->
+    <div class="export-bar">
+      <span class="export-label">📤 Exportar resultados:</span>
+      <button class="btn-export btn-xlsx" onclick="exportarExcel()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8.5 18l-1.5-2.5L5.5 18H4l2-3.3L4.1 12H5.6l1.4 2.3 1.4-2.3H10l-1.9 2.7 2 3.3H8.5zm4.7 0H12l-2.2-6h1.4l1.5 4.5 1.5-4.5H15.6L13.2 18z"/></svg>
+        Planilha Excel (.xlsx)
+      </button>
+      <button class="btn-export btn-pptx" onclick="exportarSlides()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
+        Apresentação PowerPoint (.pptx)
+      </button>
     </div>
 
     <!-- métricas resumo -->
@@ -730,6 +819,55 @@ const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov
 const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DAYS_IN_MONTH = [31,28,31,30,31,30,31,31,30,31,30,31]; // base (Feb ajustado)
 
+// Feriados nacionais fixos do Brasil (mês 0-indexed → quantidade de dias fixos)
+// Jan: Confraternização(1) | Mar/Apr: Páscoa calculada separado | Abr: Tiradentes(21) |
+// Mai: Trabalho(1) | Set: Independência(7) | Out: Padroeira(12), Servidores(28) |
+// Nov: Finados(2), República(15) | Dez: Natal(25)
+// Carnaval (fev/mar) e Corpus Christi (jun) são calculados pela Páscoa abaixo.
+function calcFeriadosNacionais(ano) {
+  // Cálculo da Páscoa pelo algoritmo de Meeus/Jones/Butcher
+  function pascoa(y) {
+    const a=y%19, b=Math.floor(y/100), c=y%100;
+    const d=Math.floor(b/4), e=b%4, f=Math.floor((b+8)/25);
+    const g=Math.floor((b-f+1)/3), h=(19*a+b-d-g+15)%30;
+    const i=Math.floor(c/4), k=c%4, l=(32+2*e+2*i-h-k)%7;
+    const m=Math.floor((a+11*h+22*l)/451);
+    const month=Math.floor((h+l-7*m+114)/31)-1; // 0-indexed
+    const day=((h+l-7*m+114)%31)+1;
+    return {month, day};
+  }
+  const p = pascoa(ano);
+  // Carnival: 2ª e 3ª feira antes da Páscoa (-48 e -47 dias)
+  function addDays(m, d, delta) {
+    const dt = new Date(ano, m, d + delta);
+    return {month: dt.getMonth(), day: dt.getDate()};
+  }
+  const carnaval1 = addDays(p.month, p.day, -48);
+  const carnaval2 = addDays(p.month, p.day, -47);
+  const sextaSanta = addDays(p.month, p.day, -2);
+  const corpusChristi = addDays(p.month, p.day, 60);
+
+  // Conta feriados por mês
+  const por_mes = Array(12).fill(0);
+  const todos = [
+    {month:0, day:1},   // Confraternização
+    carnaval1,           // Carnaval 2ª
+    carnaval2,           // Carnaval 3ª
+    sextaSanta,          // Sexta-feira Santa
+    {month:p.month, day:p.day}, // Páscoa (opcional — muitas obras não param)
+    {month:3, day:21},  // Tiradentes
+    {month:4, day:1},   // Trabalho
+    corpusChristi,       // Corpus Christi
+    {month:8, day:7},   // Independência
+    {month:9, day:12},  // Padroeira
+    {month:10, day:2},  // Finados
+    {month:10, day:15}, // República
+    {month:11, day:25}, // Natal
+  ];
+  todos.forEach(f => { por_mes[f.month]++; });
+  return por_mes;
+}
+
 const SERVICES = [
   { id:'terra',   name:'Movimento de Terra',           icon:'🪨' },
   { id:'formas',  name:'Formas / Armação / Escor.',    icon:'🏗️' },
@@ -739,9 +877,8 @@ const SERVICES = [
   { id:'livre',   name:'Ativ. Não Impactadas pela Chuva', icon:'✅' },
 ];
 
-// Fatores de retomada fixos por serviço e faixa
-// Chave: [F5_10, F10_20, F_gt20]
-const FATORES = {
+// Fatores de retomada — padrão por serviço e faixa [F5_10, F10_20, F_gt20]
+const FATORES_DEFAULT = {
   terra:    [1.20, 1.60, 2.00],
   formas:   [0.00, 0.50, 0.50],
   concreto: [0.00, 0.90, 0.90],
@@ -750,6 +887,9 @@ const FATORES = {
   livre:    [0.00, 0.00, 0.00],
 };
 
+// Cópia mutável usada nos cálculos — pode ser editada pelo usuário
+let FATORES = JSON.parse(JSON.stringify(FATORES_DEFAULT));
+
 let selectedCity = null;
 let jornadaSab = 1; // sábados NTP (1=sim, 0=não)
 let jornadaDom = 1;
@@ -757,17 +897,20 @@ let chartChuva = null;
 let chartPrat = null;
 let lastPrecipMap = null;
 let lastApiUrl = null;
+let lastResultData = null; // guarda dados do último cálculo para exportação
 
 // ══════════════════════════════════════════════
 //  INIT — tabela de feriados + serviços
 // ══════════════════════════════════════════════
 function initUI() {
-  // feriados
+  // feriados — pré-preencher com feriados nacionais do ano corrente
+  const anoAtual = new Date().getFullYear();
+  const ferNacionais = calcFeriadosNacionais(anoAtual);
   const tbody = document.getElementById('ferBody');
   tbody.innerHTML = MONTHS_FULL.map((m,i) => `
     <tr>
       <td>${m}</td>
-      <td><input class="fer-num" type="number" id="fer_${i}" value="0" min="0" max="10"></td>
+      <td><input class="fer-num" type="number" id="fer_${i}" value="${ferNacionais[i]}" min="0" max="10" title="Feriados nacionais pré-calculados. Edite se necessário."></td>
       <td><input class="fer-num" id="sab_${i}" type="number" value="" min="0" max="5" placeholder="auto"></td>
       <td><input class="fer-num" id="dom_${i}" type="number" value="" min="0" max="5" placeholder="auto"></td>
     </tr>
@@ -782,11 +925,47 @@ function initUI() {
     </div>
   `).join('');
 
+  // tabela de fatores de retomada
+  buildFatoresTable();
+
   // periodo padrão
   const now = new Date();
   document.getElementById('dtInicio').value = `${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
   const fim = new Date(now.getFullYear()+1, now.getMonth(), 1);
   document.getElementById('dtFim').value = `${String(fim.getMonth()+1).padStart(2,'0')}/${fim.getFullYear()}`;
+}
+
+// ══════════════════════════════════════════════
+//  FATORES DE RETOMADA
+// ══════════════════════════════════════════════
+function buildFatoresTable() {
+  const tbody = document.getElementById('fatBody');
+  tbody.innerHTML = SERVICES.map(s => {
+    const [f1, f2, f3] = FATORES[s.id];
+    return `
+      <tr>
+        <td>${s.icon} ${s.name}</td>
+        <td><input class="fat-num" type="number" id="fat_${s.id}_0" value="${f1}" min="0" max="5" step="0.1" onchange="readFatores()"></td>
+        <td><input class="fat-num" type="number" id="fat_${s.id}_1" value="${f2}" min="0" max="5" step="0.1" onchange="readFatores()"></td>
+        <td><input class="fat-num" type="number" id="fat_${s.id}_2" value="${f3}" min="0" max="5" step="0.1" onchange="readFatores()"></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function readFatores() {
+  SERVICES.forEach(s => {
+    FATORES[s.id] = [
+      parseFloat(document.getElementById(`fat_${s.id}_0`).value) || 0,
+      parseFloat(document.getElementById(`fat_${s.id}_1`).value) || 0,
+      parseFloat(document.getElementById(`fat_${s.id}_2`).value) || 0,
+    ];
+  });
+}
+
+function resetFatores() {
+  FATORES = JSON.parse(JSON.stringify(FATORES_DEFAULT));
+  buildFatoresTable();
 }
 
 // ══════════════════════════════════════════════
@@ -967,6 +1146,9 @@ async function calcular() {
 
   const servicos = [...document.querySelectorAll('.service-opt.active')].map(e => e.dataset.id);
   if (!servicos.length) { alert('Selecione ao menos um serviço.'); return; }
+
+  // Garantir que os fatores da tabela estejam atualizados
+  readFatores();
 
   const btn = document.getElementById('btnCalc');
   btn.disabled = true;
@@ -1163,6 +1345,7 @@ function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 //  RENDER RESULTS
 // ══════════════════════════════════════════════
 function renderResults(d) {
+  lastResultData = d; // salvar para exportação
   const { faixaMedia, mmMesMedio, pratResult, servicos, fCalMes,
           yearsUsed, yearsExcluded, startYear, endYear,
           horasDia, periodoMeses, faixaCount, faixaAnos } = d;
@@ -1391,6 +1574,386 @@ function renderResults(d) {
   document.getElementById('alertsArea').innerHTML = yearsExcluded.length
     ? `<div class="alert alert-warn" style="margin-bottom:12px;">⚠️ ${yearsExcluded.length} ano(s) excluído(s) por completude insuficiente: ${yearsExcluded.join(', ')}. Resultados baseados em ${yearsUsed.length} ano(s).</div>`
     : '';
+}
+
+// ══════════════════════════════════════════════
+//  EXPORTAR EXCEL
+// ══════════════════════════════════════════════
+function exportarExcel() {
+  if (!lastResultData) return;
+  const { faixaMedia, mmMesMedio, pratResult, servicos, fCalMes,
+          yearsUsed, startYear, endYear, horasDia, periodoMeses } = lastResultData;
+
+  const WB = XLSX.utils.book_new();
+  const SVC_NAMES = Object.fromEntries(SERVICES.map(s => [s.id, `${s.icon} ${s.name}`]));
+  const cidade = selectedCity ? `${selectedCity.name} – ${selectedCity.state}` : '';
+
+  // ── Aba 1: Resumo
+  const resumo = [
+    ['Análise de Praticabilidade – KG Consultoria'],
+    [''],
+    ['Localidade', cidade],
+    ['Fonte', 'Open-Meteo ERA5 Reanalysis'],
+    ['Período histórico', `${startYear} – ${endYear}`],
+    ['Anos válidos', yearsUsed.join(', ')],
+    ['Horas produtivas/dia', horasDia],
+    [''],
+    ['Precipitação Média Mensal (mm/mês)'],
+    ['Mês', ...MONTHS],
+    ['mm/mês', ...mmMesMedio.map(v => +v.toFixed(1))],
+  ];
+  const wsResumo = XLSX.utils.aoa_to_sheet(resumo);
+  wsResumo['!cols'] = [{wch:30}, ...MONTHS.map(()=>({wch:9}))];
+  XLSX.utils.book_append_sheet(WB, wsResumo, 'Resumo');
+
+  // ── Aba 2: Faixas de chuva
+  const faixasLabels = ['< 5 mm','5 a 10 mm','10 a 20 mm','20 a 30 mm','> 30 mm'];
+  const faixasRows = [
+    ['Número médio de dias de chuva por faixa'],
+    ['Faixa', ...MONTHS, 'Total'],
+  ];
+  for (let f = 1; f <= 5; f++) {
+    const row = MONTHS.map((_, m) => faixaMedia[m][f]);
+    faixasRows.push([faixasLabels[f-1], ...row, row.reduce((a,b)=>a+b,0)]);
+  }
+  const totalChuva = MONTHS.map((_, m) => faixaMedia[m][2]+faixaMedia[m][3]+faixaMedia[m][4]+faixaMedia[m][5]);
+  faixasRows.push(['Total dias c/ chuva ≥5mm', ...totalChuva, totalChuva.reduce((a,b)=>a+b,0)]);
+  faixasRows.push(['mm/mês médio', ...mmMesMedio.map(v=>+v.toFixed(1)), +mmMesMedio.reduce((a,b)=>a+b,0).toFixed(1)]);
+  const wsFaixas = XLSX.utils.aoa_to_sheet(faixasRows);
+  wsFaixas['!cols'] = [{wch:20}, ...MONTHS.map(()=>({wch:9})), {wch:9}];
+  XLSX.utils.book_append_sheet(WB, wsFaixas, 'Faixas de Chuva');
+
+  // ── Aba 3: Dias praticáveis (médias mensais)
+  const pratRows = [
+    ['Dias Praticáveis por Serviço e Mês (média anual)'],
+    ['Serviço', ...MONTHS, 'Total'],
+  ];
+  servicos.forEach(sid => {
+    const row = pratResult[sid];
+    pratRows.push([SVC_NAMES[sid]||sid, ...row, row.reduce((a,b)=>a+b,0)]);
+  });
+  const wsPrat = XLSX.utils.aoa_to_sheet(pratRows);
+  wsPrat['!cols'] = [{wch:30}, ...MONTHS.map(()=>({wch:9})), {wch:9}];
+  XLSX.utils.book_append_sheet(WB, wsPrat, 'Dias Praticáveis');
+
+  // ── Aba 4: Cronograma de obra (se período informado)
+  if (periodoMeses && periodoMeses.length > 0) {
+    const headerMeses = periodoMeses.map(({mes,ano}) => `${MONTHS[mes]}/${ano}`);
+    const obraRows = [
+      ['Cronograma de Praticabilidade da Obra'],
+      ['Serviço', ...headerMeses, 'Total', 'Horas'],
+    ];
+    servicos.forEach(sid => {
+      const [f510, f1020, fgt20] = FATORES[sid];
+      let tot = 0;
+      const diasRow = periodoMeses.map(({mes, ano}) => {
+        const nd = diasNoMes(mes, ano);
+        const ferro = parseInt(document.getElementById(`fer_${mes}`).value) || 0;
+        const sabEl = document.getElementById(`sab_${mes}`).value;
+        const domEl = document.getElementById(`dom_${mes}`).value;
+        const { sabs, doms } = contaSabDom(mes, ano);
+        const sabNTP = sabEl !== '' ? parseInt(sabEl) : (jornadaSab ? sabs : 0);
+        const domNTP = domEl !== '' ? parseInt(domEl) : (jornadaDom ? doms : 0);
+        const improd = Math.min(nd, sabNTP + domNTP + ferro);
+        const fCal = 1 - (improd / nd);
+        const N510 = faixaMedia[mes][2], N1020 = faixaMedia[mes][3];
+        const Ngt20 = faixaMedia[mes][4] + faixaMedia[mes][5];
+        const perda = N510*f510 + N1020*f1020 + Ngt20*fgt20;
+        const dias = Math.max(0, Math.round((nd - perda) * fCal));
+        tot += dias;
+        return dias;
+      });
+      const horas = Math.round(tot * horasDia);
+      obraRows.push([SVC_NAMES[sid]||sid, ...diasRow, tot, horas]);
+    });
+    const wsObra = XLSX.utils.aoa_to_sheet(obraRows);
+    wsObra['!cols'] = [{wch:30}, ...headerMeses.map(()=>({wch:11})), {wch:9}, {wch:9}];
+    XLSX.utils.book_append_sheet(WB, wsObra, 'Cronograma Obra');
+  }
+
+  // ── Aba 5: Fatores de retomada
+  const fatRows = [
+    ['Fatores de Retomada Utilizados'],
+    ['Serviço', '5–10 mm', '10–20 mm', '> 20 mm'],
+  ];
+  SERVICES.forEach(s => {
+    const [f1,f2,f3] = FATORES[s.id];
+    fatRows.push([`${s.icon} ${s.name}`, f1, f2, f3]);
+  });
+  const wsFat = XLSX.utils.aoa_to_sheet(fatRows);
+  wsFat['!cols'] = [{wch:35},{wch:12},{wch:12},{wch:12}];
+  XLSX.utils.book_append_sheet(WB, wsFat, 'Fatores');
+
+  const fileName = `Praticabilidade_${(selectedCity?.name||'KG').replace(/\s/g,'_')}_${new Date().getFullYear()}.xlsx`;
+  XLSX.writeFile(WB, fileName);
+}
+
+// ══════════════════════════════════════════════
+//  EXPORTAR POWERPOINT
+// ══════════════════════════════════════════════
+async function exportarSlides() {
+  if (!lastResultData) return;
+  const { faixaMedia, mmMesMedio, pratResult, servicos,
+          yearsUsed, startYear, endYear, horasDia, periodoMeses } = lastResultData;
+
+  const SVC_NAMES = Object.fromEntries(SERVICES.map(s => [s.id, s.name]));
+  const SVC_ICONS = Object.fromEntries(SERVICES.map(s => [s.id, s.icon]));
+  const cidade = selectedCity ? `${selectedCity.name} – ${selectedCity.state}` : '';
+  const totalMm = mmMesMedio.reduce((a,b)=>a+b,0).toFixed(0);
+  const diasChuvaAno = faixaMedia.reduce((a,m)=>a+m[2]+m[3]+m[4]+m[5], 0);
+
+  const NAVY  = '1a1f2e';
+  const BLUE  = '2d6be4';
+  const LBLUE = '4a84f0';
+  const GREEN = '2dd4a0';
+  const WARN  = 'f0b429';
+  const WHITE = 'FFFFFF';
+  const MUTED = '8fa3c8';
+  const SURF  = '222840';
+
+  const pres = new PptxGenJS();
+  pres.layout = 'LAYOUT_16x9';
+  pres.title = `Praticabilidade – ${cidade}`;
+
+  const W = 10, H = 5.625;
+  const mkShadow = () => ({ type: 'outer', color: '000000', blur: 8, offset: 2, angle: 45, opacity: 0.18 });
+
+  // ── SLIDE 1: Capa
+  {
+    const sl = pres.addSlide();
+    sl.background = { color: NAVY };
+    sl.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:W, h:1.1, fill:{color:BLUE} });
+    sl.addText('KG', { x:0.35, y:0.2, w:0.7, h:0.7, fontSize:22, bold:true, color:WHITE, align:'center' });
+    sl.addText('Análise de Praticabilidade', { x:0.35, y:1.5, w:9.3, h:1.0, fontSize:36, bold:true, color:WHITE, fontFace:'Calibri' });
+    sl.addText(cidade, { x:0.35, y:2.55, w:9.3, h:0.5, fontSize:20, color:LBLUE, fontFace:'Calibri' });
+    sl.addText(`Fonte: Open-Meteo ERA5  ·  Histórico: ${startYear}–${endYear}  ·  ${yearsUsed.length} anos válidos`,
+      { x:0.35, y:3.1, w:9.3, h:0.4, fontSize:13, color:MUTED, fontFace:'Calibri' });
+    sl.addShape(pres.shapes.RECTANGLE, { x:0, y:H-0.55, w:W, h:0.55, fill:{color:SURF} });
+    sl.addText('KG Consultoria & Gestão de Projetos de Infraestrutura',
+      { x:0.3, y:H-0.5, w:9.4, h:0.45, fontSize:11, color:MUTED, fontFace:'Calibri' });
+  }
+
+  // ── SLIDE 2: Métricas resumo
+  {
+    const sl = pres.addSlide();
+    sl.background = { color: NAVY };
+    sl.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:W, h:0.8, fill:{color:BLUE} });
+    sl.addText('Resumo Climatológico', { x:0.35, y:0.08, w:9.3, h:0.65, fontSize:22, bold:true, color:WHITE, fontFace:'Calibri' });
+    sl.addText(cidade, { x:0.35, y:0.12, w:9.3, h:0.65, fontSize:13, color:'cce0ff', fontFace:'Calibri', align:'right' });
+
+    const mesMaisIdx = mmMesMedio.indexOf(Math.max(...mmMesMedio));
+    const mesMenoIdx = mmMesMedio.indexOf(Math.min(...mmMesMedio));
+    const metrics = [
+      { label:'Precipitação anual', val:`${totalMm} mm`, icon:'🌧️' },
+      { label:'Dias c/ chuva ≥5mm/ano', val:`${diasChuvaAno} dias`, icon:'📅' },
+      { label:'Mês mais chuvoso', val:`${MONTHS[mesMaisIdx]}\n${mmMesMedio[mesMaisIdx].toFixed(0)} mm`, icon:'💧' },
+      { label:'Mês mais seco', val:`${MONTHS[mesMenoIdx]}\n${mmMesMedio[mesMenoIdx].toFixed(0)} mm`, icon:'☀️' },
+    ];
+    const cx = [0.3, 2.8, 5.3, 7.8], cw = 2.3;
+    metrics.forEach((m, i) => {
+      sl.addShape(pres.shapes.ROUNDED_RECTANGLE, { x:cx[i], y:1.05, w:cw, h:3.5, fill:{color:SURF}, rectRadius:0.1, shadow:mkShadow() });
+      sl.addText(m.icon, { x:cx[i]+0.1, y:1.2, w:cw-0.2, h:0.6, fontSize:26, align:'center' });
+      sl.addText(m.val, { x:cx[i]+0.1, y:1.9, w:cw-0.2, h:1.0, fontSize:20, bold:true, color:LBLUE, align:'center', fontFace:'Calibri' });
+      sl.addText(m.label, { x:cx[i]+0.1, y:3.1, w:cw-0.2, h:0.7, fontSize:12, color:MUTED, align:'center', fontFace:'Calibri' });
+    });
+  }
+
+  // ── SLIDE 3: Precipitação média mensal (gráfico de barras)
+  {
+    const sl = pres.addSlide();
+    sl.background = { color: NAVY };
+    sl.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:W, h:0.8, fill:{color:BLUE} });
+    sl.addText('Precipitação Média Mensal', { x:0.35, y:0.08, w:9.3, h:0.65, fontSize:22, bold:true, color:WHITE, fontFace:'Calibri' });
+    sl.addChart(pres.charts.BAR, [{
+      name: 'mm/mês', labels: MONTHS, values: mmMesMedio.map(v => +v.toFixed(1))
+    }], {
+      x:0.4, y:1.0, w:9.2, h:4.1, barDir:'col',
+      chartColors: mmMesMedio.map(v =>
+        v > 150 ? 'e05c5c' : v > 100 ? 'f0b429' : v > 50 ? '2d6be4' : '4a84f0'
+      ),
+      chartArea: { fill:{ color: SURF }, roundedCorners: true },
+      catAxisLabelColor: MUTED, valAxisLabelColor: MUTED,
+      valGridLine: { color:'2a3250', size:0.5 }, catGridLine: { style:'none' },
+      showValue: true, dataLabelColor: WHITE, dataLabelFontSize: 10,
+      showLegend: false,
+    });
+  }
+
+  // ── SLIDE 4: Faixas de chuva (tabela)
+  {
+    const sl = pres.addSlide();
+    sl.background = { color: NAVY };
+    sl.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:W, h:0.8, fill:{color:BLUE} });
+    sl.addText('Dias de Chuva por Faixa (média)', { x:0.35, y:0.08, w:9.3, h:0.65, fontSize:22, bold:true, color:WHITE, fontFace:'Calibri' });
+
+    const faixasLabels = ['< 5mm','5–10mm','10–20mm','20–30mm','> 30mm'];
+    const headerRow = [{ text:'Faixa', options:{ bold:true, color:WHITE, fill:{color:BLUE} } },
+      ...MONTHS.map(m => ({ text:m, options:{ bold:true, color:WHITE, fill:{color:BLUE} } }))];
+    const tableData = [headerRow];
+    for (let f = 1; f <= 5; f++) {
+      tableData.push([
+        { text:faixasLabels[f-1], options:{ color:WHITE, fill:{color: f<=1?'2a3250':f<=2?'1e3a6e':f<=3?'b8860b':f<=4?'8b3a0f':'6b1414'} } },
+        ...MONTHS.map((_, m) => ({ text: String(faixaMedia[m][f]), options:{ color:WHITE, fill:{color:SURF} } }))
+      ]);
+    }
+    sl.addTable(tableData, { x:0.3, y:0.95, w:9.4, h:4.5,
+      border:{ pt:0.5, color:'2a3250' }, colW:[1.4,...MONTHS.map(()=>0.65)],
+      fontSize:11, fontFace:'Calibri', align:'center', valign:'middle' });
+  }
+
+  // ── SLIDE 5: Dias praticáveis (gráfico de linhas)
+  {
+    const sl = pres.addSlide();
+    sl.background = { color: NAVY };
+    sl.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:W, h:0.8, fill:{color:BLUE} });
+    sl.addText('Dias Praticáveis por Serviço', { x:0.35, y:0.08, w:9.3, h:0.65, fontSize:22, bold:true, color:WHITE, fontFace:'Calibri' });
+
+    const CHART_COLORS = ['4a84f0','2dd4a0','f0b429','e07d2d','e05c5c','a78bfa'];
+    const datasets = servicos.map((sid, i) => ({
+      name: SVC_NAMES[sid] || sid,
+      labels: MONTHS,
+      values: pratResult[sid],
+    }));
+    sl.addChart(pres.charts.LINE, datasets, {
+      x:0.4, y:1.0, w:9.2, h:4.1,
+      chartColors: servicos.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+      chartArea: { fill:{ color: SURF }, roundedCorners: true },
+      catAxisLabelColor: MUTED, valAxisLabelColor: MUTED,
+      valGridLine: { color:'2a3250', size:0.5 }, catGridLine: { style:'none' },
+      lineSize: 2.5, lineSmooth: true,
+      showLegend: true, legendPos: 'b', legendFontColor: MUTED, legendFontSize: 10,
+    });
+  }
+
+  // ── SLIDE 6: Tabela de dias praticáveis
+  {
+    const sl = pres.addSlide();
+    sl.background = { color: NAVY };
+    sl.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:W, h:0.8, fill:{color:BLUE} });
+    sl.addText('Dias Praticáveis — Tabela Mensal', { x:0.35, y:0.08, w:9.3, h:0.65, fontSize:22, bold:true, color:WHITE, fontFace:'Calibri' });
+
+    const headerRow = [
+      { text:'Serviço', options:{ bold:true, color:WHITE, fill:{color:BLUE} } },
+      ...MONTHS.map(m => ({ text:m, options:{ bold:true, color:WHITE, fill:{color:BLUE} } })),
+      { text:'Total', options:{ bold:true, color:WHITE, fill:{color:BLUE} } },
+    ];
+    const allVals = servicos.flatMap(sid => pratResult[sid]);
+    const maxV = Math.max(...allVals), minV = Math.min(...allVals);
+    const tableData = [headerRow];
+    servicos.forEach(sid => {
+      const row = pratResult[sid];
+      const total = row.reduce((a,b)=>a+b,0);
+      tableData.push([
+        { text:`${SVC_ICONS[sid]||''} ${SVC_NAMES[sid]||sid}`, options:{ color:WHITE, fill:{color:SURF}, bold:true } },
+        ...row.map(v => ({
+          text: String(v),
+          options: { color:WHITE, fill:{ color: v>=maxV*0.85?'1a4a2e': v<=minV*1.3+2?'4a1010':SURF } }
+        })),
+        { text: String(total), options:{ bold:true, color:GREEN, fill:{color:SURF} } },
+      ]);
+    });
+
+    const nSvc = servicos.length;
+    const rowH = Math.min(0.65, 3.8 / nSvc);
+    sl.addTable(tableData, { x:0.2, y:0.9, w:9.6, h:Math.min(4.5, rowH*(nSvc+1)+0.1),
+      border:{ pt:0.5, color:'2a3250' }, colW:[2.2,...MONTHS.map(()=>0.55),0.7],
+      fontSize:10, fontFace:'Calibri', align:'center', valign:'middle' });
+  }
+
+  // ── SLIDE 7: Cronograma de obra (se informado)
+  if (periodoMeses && periodoMeses.length > 0) {
+    const sl = pres.addSlide();
+    sl.background = { color: NAVY };
+    sl.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:W, h:0.8, fill:{color:BLUE} });
+    sl.addText('Cronograma de Praticabilidade da Obra', { x:0.35, y:0.08, w:9.3, h:0.65, fontSize:20, bold:true, color:WHITE, fontFace:'Calibri' });
+
+    const headerRow = [
+      { text:'Serviço', options:{ bold:true, color:WHITE, fill:{color:BLUE} } },
+      ...periodoMeses.map(({mes,ano}) => ({ text:`${MONTHS[mes]}\n${ano}`, options:{ bold:true, color:WHITE, fill:{color:BLUE} } })),
+      { text:'Total', options:{ bold:true, color:WHITE, fill:{color:BLUE} } },
+      { text:'Horas', options:{ bold:true, color:WHITE, fill:{color:BLUE} } },
+    ];
+    const tableData = [headerRow];
+    servicos.forEach(sid => {
+      const [f510, f1020, fgt20] = FATORES[sid];
+      let tot = 0;
+      const diasRow = periodoMeses.map(({mes, ano}) => {
+        const nd = diasNoMes(mes, ano);
+        const ferro = parseInt(document.getElementById(`fer_${mes}`).value) || 0;
+        const sabEl = document.getElementById(`sab_${mes}`).value;
+        const domEl = document.getElementById(`dom_${mes}`).value;
+        const { sabs, doms } = contaSabDom(mes, ano);
+        const sabNTP = sabEl !== '' ? parseInt(sabEl) : (jornadaSab ? sabs : 0);
+        const domNTP = domEl !== '' ? parseInt(domEl) : (jornadaDom ? doms : 0);
+        const improd = Math.min(nd, sabNTP + domNTP + ferro);
+        const fCal = 1 - (improd / nd);
+        const N510 = faixaMedia[mes][2], N1020 = faixaMedia[mes][3];
+        const Ngt20 = faixaMedia[mes][4] + faixaMedia[mes][5];
+        const perda = N510*f510 + N1020*f1020 + Ngt20*fgt20;
+        const dias = Math.max(0, Math.round((nd - perda) * fCal));
+        tot += dias;
+        return dias;
+      });
+      const horas = Math.round(tot * horasDia);
+      tableData.push([
+        { text:`${SVC_ICONS[sid]||''} ${SVC_NAMES[sid]||sid}`, options:{ color:WHITE, fill:{color:SURF}, bold:true } },
+        ...diasRow.map(v => ({ text:String(v), options:{ color:WHITE, fill:{color:SURF} } })),
+        { text:String(tot), options:{ bold:true, color:GREEN, fill:{color:SURF} } },
+        { text:`${horas}h`, options:{ bold:true, color:WARN, fill:{color:SURF} } },
+      ]);
+    });
+    const colW = periodoMeses.length <= 6
+      ? [2.5, ...periodoMeses.map(()=>1.0), 0.8, 0.8]
+      : [2.0, ...periodoMeses.map(()=>0.55), 0.7, 0.7];
+    sl.addTable(tableData, { x:0.2, y:0.9, w:9.6, h:4.5,
+      border:{ pt:0.5, color:'2a3250' }, colW,
+      fontSize:10, fontFace:'Calibri', align:'center', valign:'middle' });
+  }
+
+  // ── SLIDE 8: Fatores de retomada
+  {
+    const sl = pres.addSlide();
+    sl.background = { color: NAVY };
+    sl.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:W, h:0.8, fill:{color:BLUE} });
+    sl.addText('Fatores de Retomada', { x:0.35, y:0.08, w:9.3, h:0.65, fontSize:22, bold:true, color:WHITE, fontFace:'Calibri' });
+    sl.addText('Número de dias improdutivos gerados por cada dia de chuva em cada faixa de precipitação',
+      { x:0.35, y:0.88, w:9.3, h:0.45, fontSize:12, color:MUTED, fontFace:'Calibri' });
+
+    const headerRow = [
+      { text:'Serviço', options:{ bold:true, color:WHITE, fill:{color:BLUE} } },
+      { text:'5–10 mm', options:{ bold:true, color:WHITE, fill:{color:BLUE} } },
+      { text:'10–20 mm', options:{ bold:true, color:WHITE, fill:{color:BLUE} } },
+      { text:'> 20 mm', options:{ bold:true, color:WHITE, fill:{color:BLUE} } },
+    ];
+    const tableData = [headerRow];
+    SERVICES.forEach(s => {
+      const [f1,f2,f3] = FATORES[s.id];
+      tableData.push([
+        { text:`${s.icon} ${s.name}`, options:{ color:WHITE, fill:{color:SURF} } },
+        { text:String(f1), options:{ color:f1>0?WARN:GREEN, bold:true, fill:{color:SURF} } },
+        { text:String(f2), options:{ color:f2>0?WARN:GREEN, bold:true, fill:{color:SURF} } },
+        { text:String(f3), options:{ color:f3>0?WARN:GREEN, bold:true, fill:{color:SURF} } },
+      ]);
+    });
+    sl.addTable(tableData, { x:1.5, y:1.4, w:7, h:3.8,
+      border:{ pt:0.5, color:'2a3250' }, colW:[3.2, 1.2, 1.2, 1.2],
+      fontSize:13, fontFace:'Calibri', align:'center', valign:'middle' });
+  }
+
+  // ── SLIDE 9: Encerramento
+  {
+    const sl = pres.addSlide();
+    sl.background = { color: NAVY };
+    sl.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:W, h:H, fill:{color:BLUE, transparency:88} });
+    sl.addText('KG', { x:4.0, y:0.9, w:2, h:1.2, fontSize:52, bold:true, color:BLUE, align:'center', fontFace:'Calibri' });
+    sl.addText('KG Consultoria', { x:0.5, y:2.2, w:9, h:0.7, fontSize:28, bold:true, color:WHITE, align:'center', fontFace:'Calibri' });
+    sl.addText('Gestão de Projetos de Infraestrutura', { x:0.5, y:2.9, w:9, h:0.5, fontSize:16, color:MUTED, align:'center', fontFace:'Calibri' });
+    sl.addText(`Análise gerada em ${new Date().toLocaleDateString('pt-BR')}  ·  Open-Meteo ERA5  ·  ${cidade}`,
+      { x:0.5, y:4.4, w:9, h:0.4, fontSize:11, color:MUTED, align:'center', fontFace:'Calibri' });
+  }
+
+  const fileName = `Praticabilidade_${(selectedCity?.name||'KG').replace(/\s/g,'_')}_${new Date().getFullYear()}.pptx`;
+  await pres.writeFile({ fileName });
 }
 
 // ══════════════════════════════════════════════
