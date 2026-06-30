@@ -168,12 +168,28 @@ const sb = window.supabase.createClient(_URL, _KEY);
 let editingId = null;
 let currentUserId = null;
 
-// Verifica sessão
-sb.auth.getSession().then(({ data }) => {
+// Verifica sessão E se o usuário é admin
+checkAdminSession();
+
+async function checkAdminSession() {
+  const { data } = await sb.auth.getSession();
   if (!data.session) { window.location.href = 'login.html'; return; }
+
   currentUserId = data.session.user.id;
+
+  const { data: profile, error } = await sb.from('profiles')
+    .select('role')
+    .eq('id', currentUserId)
+    .single();
+
+  if (error || !profile || profile.role !== 'admin') {
+    await sb.auth.signOut();
+    window.location.href = 'login.html';
+    return;
+  }
+
   loadUsers();
-});
+}
 
 async function loadUsers() {
   const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
@@ -239,14 +255,24 @@ async function saveUser() {
     if (error) showNotif('Erro: ' + error.message, 'error');
     else { showNotif('Usuário atualizado!', 'success'); closeModal(); loadUsers(); }
   } else {
-    // Cria usuário via signUp — o usuário receberá confirmação por e-mail
-    // mas já fica funcional pois desabilitamos confirmação no Supabase
+    // Guarda a sessão atual do admin antes de criar o novo usuário,
+    // pois signUp troca automaticamente a sessão ativa para a do novo usuário
+    const { data: adminSession } = await sb.auth.getSession();
+
     const { data, error } = await sb.auth.signUp({ email, password, options: { data: { name } } });
 
     if (error) {
       showNotif('Erro ao criar: ' + error.message, 'error');
       document.getElementById('btnSave').disabled = false;
       return;
+    }
+
+    // Restaura a sessão do admin (signUp logou automaticamente como o novo usuário)
+    if (adminSession?.session) {
+      await sb.auth.setSession({
+        access_token: adminSession.session.access_token,
+        refresh_token: adminSession.session.refresh_token
+      });
     }
 
     // Salva perfil na tabela profiles
